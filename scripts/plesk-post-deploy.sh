@@ -4,6 +4,10 @@ set -euo pipefail
 # Plesk Git "Additional deployment actions" script.
 # Must not assume cwd: Plesk may run this from httpdocs or elsewhere.
 
+# Hooks sometimes get a PATH with only Node/npm — no coreutils (dirname, tee, date).
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+export PATH="/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:$PATH"
+
 LOG_FILE="/tmp/naturalisation-tracker-deploy.log"
 LOCK_FILE="/tmp/naturalisation-tracker-deploy.lock"
 APP_DIR="web"
@@ -25,7 +29,13 @@ if command -v flock >/dev/null 2>&1; then
   fi
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve script directory without `dirname` (some Plesk hooks lack coreutils in PATH).
+_script="${BASH_SOURCE[0]}"
+if [[ "$_script" == */* ]]; then
+  SCRIPT_DIR="$(cd "${_script%/*}" && pwd)"
+else
+  SCRIPT_DIR="$(pwd)"
+fi
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 {
@@ -34,12 +44,9 @@ cd "$REPO_ROOT"
 } >>"$LOG_FILE" 2>&1
 
 if [ ! -d "$APP_DIR" ]; then
-  echo "Missing $APP_DIR under $REPO_ROOT (wrong repo layout or cwd)." | tee -a "$LOG_FILE"
+  echo "Missing $APP_DIR under $REPO_ROOT (wrong repo layout or cwd)." >>"$LOG_FILE" 2>&1
   exit 1
 fi
-
-# Plesk deployment hooks may run with a restricted PATH.
-export PATH="/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:/usr/local/bin:/usr/bin:$PATH"
 
 if ! command -v npm >/dev/null 2>&1; then
   if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -50,13 +57,17 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
-  echo "npm not found in PATH. Current PATH: $PATH" | tee -a "$LOG_FILE"
-  echo "Install Node.js in Plesk and ensure npm is available to deployment scripts." | tee -a "$LOG_FILE"
+  echo "npm not found in PATH. Current PATH: $PATH" >>"$LOG_FILE" 2>&1
+  echo "Install Node.js in Plesk and ensure npm is available to deployment scripts." >>"$LOG_FILE" 2>&1
   exit 1
 fi
 
 # Mirror stdout/stderr to log (append after bootstrap lines above).
-exec > >(tee -a "$LOG_FILE") 2>&1
+if command -v tee >/dev/null 2>&1; then
+  exec > >(tee -a "$LOG_FILE") 2>&1
+else
+  exec >>"$LOG_FILE" 2>&1
+fi
 
 echo "Deployment log: $LOG_FILE"
 echo "Started at: $(date -Is)"
