@@ -31,6 +31,9 @@ yarn-error.log*
 # server-only Plesk deploy path overrides (never commit)
 .plesk-node-env.sh
 
+# Vendored Node.js binary tree for Plesk chroot deploy (see README; large)
+tools/node/
+
 # vercel
 .vercel
 

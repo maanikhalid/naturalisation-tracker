@@ -88,9 +88,22 @@ So the same script that works in an interactive SSH session as root can fail in 
 **Practical options:**
 
 1. **Allow SSH without chroot** for that subscription (Plesk / host policy), so hooks see the real filesystem; or run deploy commands over full SSH instead of the Git hook.
-2. Install **Node/npm inside the jail**, e.g. **nvm** under `$HOME` (`~/.nvm/.../bin/npm`). The deploy script prepends those paths first.
-3. Put a **`.plesk-node-env.sh`** in the repo root on the server (gitignored) with `NPM=...` or `NODE_BIN=` + `NPM_CLI=` pointing to binaries **inside** the subscription.
-4. **Build elsewhere** (CI) and deploy artifacts, and keep the hook minimal (no `npm` on server).
+2. **Vendor Node inside the repo** (recommended when you cannot change Plesk policy): extract the official **Linux x64** Node binary tarball into **`naturalisation-tracker/tools/node/`** so it contains `tools/node/bin/node` and `tools/node/bin/npm` (see **Vendoring Node** below). That path is inside the chroot. The directory `tools/node/` is gitignored.
+3. Install **nvm** under the real home directory. Plesk often sets **`HOME=/`** in the hook, which breaks `~/.nvm`. The deploy script sets **`HOME` to the parent of the repo** (e.g. `/httpdocs`) when `HOME` is `/`, so nvm under **`/httpdocs/.nvm`** is discovered if you install it there (SSH once as the subscription user, or copy files in).
+4. Put a **`.plesk-node-env.sh`** in the repo root on the server (gitignored) with `NPM=...` or `NODE_BIN=` + `NPM_CLI=` pointing to binaries **inside** the subscription.
+5. **Build elsewhere** (CI) and deploy artifacts, and keep the hook minimal (no `npm` on server).
+
+#### Vendoring Node for chroot
+
+On a machine with Node (or download in a browser), get the **Linux 64-bit** binary from [Node.js downloads](https://nodejs.org/en/download/) (e.g. `linux-x64` **tar.xz**). On the server (or before commit, locally), from the **repository root** (`naturalisation-tracker/`):
+
+```bash
+mkdir -p tools
+tar -xJf node-v22.14.0-linux-x64.tar.xz -C tools
+mv tools/node-v22.14.0-linux-x64 tools/node
+```
+
+Use the version you need; the layout must be **`tools/node/bin/npm`** (and `node`). Do not commit `tools/node/` (it is ignored). Push the rest of the repo; after Git deploy, **`bash scripts/plesk-post-deploy.sh`** will pick up the vendored npm first.
 
 #### Command
 

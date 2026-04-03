@@ -16,6 +16,17 @@ _sdir=${_script%/*}
 SCRIPT_DIR="$(cd "${_sdir}" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# Plesk chroot often sets HOME=/ so ~/.nvm never resolves. Use parent of repo (e.g. /httpdocs) or repo as HOME.
+if [[ -z "${HOME:-}" || "${HOME}" == "/" ]]; then
+  _repo_parent="${REPO_ROOT%/*}"
+  if [[ -n "${_repo_parent}" && "${_repo_parent}" != "${REPO_ROOT}" ]]; then
+    export HOME="${_repo_parent}"
+  else
+    export HOME="${REPO_ROOT}"
+  fi
+  echo "HOME was empty or /; using HOME=${HOME} for nvm and tool discovery (chroot)." >&2
+fi
+
 LS_CMD=$(command -v ls 2>/dev/null || echo /bin/ls)
 FIND_CMD=$(command -v find 2>/dev/null || true)
 HEAD_CMD=$(command -v head 2>/dev/null || true)
@@ -52,11 +63,10 @@ if [[ -n "${NODE_BIN}" && -n "${NPM_CLI}" ]]; then
   fi
 fi
 
-# PATH: chroot-safe first ($HOME), then typical non-chroot locations.
+# PATH: chroot-safe first (vendored Node, $HOME, repo parent nvm), then typical host paths.
 export PATH="${REPO_ROOT}/tools/node/bin:${PATH}"
 if [[ -n "${HOME:-}" ]]; then
   export PATH="${HOME}/.local/bin:${HOME}/bin:${PATH}"
-  # nvm installs per-version bins here (common workaround when /usr is not visible).
   if [[ -d "${HOME}/.nvm/versions/node" ]]; then
     shopt -s nullglob
     for _nvbin in "${HOME}/.nvm/versions/node"/*/bin; do
@@ -65,7 +75,31 @@ if [[ -n "${HOME:-}" ]]; then
     shopt -u nullglob
   fi
 fi
+_repo_parent="${REPO_ROOT%/*}"
+if [[ -n "${_repo_parent}" && "${_repo_parent}" != "${REPO_ROOT}" && -d "${_repo_parent}/.nvm/versions/node" ]]; then
+  shopt -s nullglob
+  for _nvbin in "${_repo_parent}/.nvm/versions/node"/*/bin; do
+    export PATH="${_nvbin}:${PATH}"
+  done
+  shopt -u nullglob
+fi
 export PATH="/usr/bin:/bin:/usr/sbin:/usr/local/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:/opt/plesk/node/22/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:${PATH}"
+
+# 0a) Node vendored inside repo (works in chroot) — see README "Vendoring Node for chroot"
+if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
+  _tnpm="${REPO_ROOT}/tools/node/bin/npm"
+  _tnode="${REPO_ROOT}/tools/node/bin/node"
+  _tcli="${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"
+  if [[ -f "${_tnpm}" ]] && "${_tnpm}" --version >/dev/null 2>&1; then
+    NPM=${_tnpm}
+    echo "Using vendored npm: ${NPM}"
+  elif try_node_cli "${_tnode}" "${_tcli}"; then
+    NODE_BIN=${_tnode}
+    NPM_CLI=${_tcli}
+    echo "Using vendored node + npm-cli: ${NODE_BIN} ${NPM_CLI}"
+    export PATH="${NODE_BIN%/*}:${PATH}"
+  fi
+fi
 
 # 0) After PATH includes $HOME, npm may resolve (nvm, etc.)
 if [[ -z "${NPM}" ]]; then
@@ -184,7 +218,7 @@ run_npm() {
     "${LS_CMD}" -la "${HOME:-.}" 2>&1 || true
     "${LS_CMD}" -la /opt 2>&1 || true
     "${LS_CMD}" -la /usr/bin/npm 2>&1 || true
-    echo "--- hint: install Node via nvm in HOME, or set ${REPO_ROOT}/.plesk-node-env.sh ---" >&2
+    echo "--- hint: vendor Node into ${REPO_ROOT}/tools/node (see README), or nvm install under ${HOME}, or ${REPO_ROOT}/.plesk-node-env.sh ---" >&2
     exit 1
   fi
 }
