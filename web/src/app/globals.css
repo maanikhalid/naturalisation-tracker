@@ -1,9 +1,85 @@
 @import "tailwindcss";
 @import "govuk-frontend/dist/govuk/govuk-frontend.min.css";
 
+/* Grift (replacing GDS Transport — not licensed for this site). Arial as fallback. */
+@font-face {
+  font-family: Grift;
+  font-style: normal;
+  font-weight: 400;
+  src:
+    url("/font/Web-TT/Grift-Regular.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-Regular.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Grift;
+  font-style: italic;
+  font-weight: 400;
+  src:
+    url("/font/Web-TT/Grift-Italic.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-Italic.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Grift;
+  font-style: normal;
+  font-weight: 500;
+  src:
+    url("/font/Web-TT/Grift-Medium.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-Medium.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Grift;
+  font-style: normal;
+  font-weight: 600;
+  src:
+    url("/font/Web-TT/Grift-SemiBold.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-SemiBold.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Grift;
+  font-style: normal;
+  font-weight: 700;
+  src:
+    url("/font/Web-TT/Grift-Bold.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-Bold.woff") format("woff");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Grift;
+  font-style: italic;
+  font-weight: 700;
+  src:
+    url("/font/Web-TT/Grift-BoldItalic.woff2") format("woff2"),
+    url("/font/Web-TT/Grift-BoldItalic.woff") format("woff");
+  font-display: swap;
+}
+
 body {
   margin: 0;
   background: #f8f8f8;
+  font-family: Grift, Arial, sans-serif;
+}
+
+/* GOV.UK Frontend hardcodes "GDS Transport" on many components */
+[class*="govuk-"] {
+  font-family: Grift, Arial, sans-serif !important;
+}
+
+pre,
+code,
+kbd,
+samp {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace !important;
 }
 
 .app-main {
