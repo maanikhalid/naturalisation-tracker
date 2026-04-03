@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contributors | UK Naturalisation Tracker",
+  title: "Contributors",
   description:
     "Credits and how to contribute or send feedback to the UK naturalisation tracker",
 };
