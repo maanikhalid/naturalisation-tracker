@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@import "govuk-frontend/dist/govuk/govuk-frontend.min.css";
+
+body {
+  margin: 0;
+  background: #f8f8f8;
+}
+
+.dark-mode body {
+  background: #1f1f1f;
+  color: #f3f2f1;
+}
+
+.dark-mode .kpi-card {
+  background: #2a2a2a;
+  border-color: #505a5f;
+}
+
+.app-main {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border: 1px solid #b1b4b6;
+  padding: 16px;
+}
+
+.success-text {
+  color: #00703c;
+  font-weight: 700;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr 180px 110px 160px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 800px) {
+  .inline-form {
+    grid-template-columns: 1fr;
+  }
+}

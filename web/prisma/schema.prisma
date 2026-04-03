@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationMethod {
+  ONLINE
+  POST
+}
+
+enum SourceType {
+  WEBSITE
+  REDDIT
+}
+
+enum TimelineStatus {
+  SUBMITTED
+  BIOMETRICS_DONE
+  EMAIL_RECEIVED
+  APPROVED
+  CEREMONY_PENDING
+  CEREMONY_DONE
+}
+
+model TimelineEntry {
+  id                  String            @id @default(cuid())
+  username            String?
+  applicationMethod   ApplicationMethod
+  applicationDate     DateTime
+  biometricDate       DateTime
+  approvalDate        DateTime?
+  receivedHomeOfficeEmail Boolean      @default(false)
+  ceremonyDate        DateTime?
+  status              TimelineStatus    @default(SUBMITTED)
+  sourceType          SourceType        @default(WEBSITE)
+  sourceReference     String?
+  isVerified          Boolean           @default(false)
+  isRemoved           Boolean           @default(false)
+  removedReason       String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([applicationDate])
+  @@index([approvalDate])
+  @@index([sourceType])
+  @@index([isRemoved, createdAt])
+  @@index([username, applicationDate])
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model RedditTrackingConfig {
+  id            String   @id @default(cuid())
+  postUrl       String   @unique
+  syncIntervalMins Int   @default(360)
+  active        Boolean  @default(true)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
