@@ -25,6 +25,45 @@ function extractDate(raw: string): Date | null {
   return Number.isNaN(d.valueOf()) ? null : d;
 }
 
+/** Normalise markdown bullets / bold so regex matches "**Application date:**" etc. */
+function normaliseTimelineLine(line: string): string {
+  return line
+    .replace(/\*+/g, " ")
+    .replace(/^[\s>*-]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Pick the line that actually carries the milestone date. Using the first line that merely
+ * contains "application" matches headings like "Application timeline" and yields no date.
+ */
+function lineWithMilestoneDate(
+  lines: string[],
+  patterns: RegExp[]
+): string | null {
+  const normalised = lines.map((l) => normaliseTimelineLine(l));
+  for (let i = 0; i < normalised.length; i += 1) {
+    const line = normalised[i];
+    if (!line) continue;
+    if (!patterns.some((re) => re.test(line))) continue;
+    if (extractDate(line)) return line;
+  }
+  return null;
+}
+
+function inferApplicationMethod(bodyLower: string, lines: string[]): "POST" | "ONLINE" {
+  const methodLine = lines.map(normaliseTimelineLine).find((l) => l.includes("application method"));
+  if (methodLine) {
+    if (/\bonline\b/.test(methodLine)) return "ONLINE";
+    if (/\bpost\b/.test(methodLine) && !/\bonline\b/.test(methodLine)) return "POST";
+  }
+  if (/\bapplication\s*method\s*:\s*post\b/.test(bodyLower)) return "POST";
+  if (/\bapplication\s*method\s*:\s*online\b/.test(bodyLower)) return "ONLINE";
+  return "ONLINE";
+}
+
 export async function POST() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,19 +87,40 @@ export async function POST() {
       const comments = payload?.[1]?.data?.children ?? [];
 
       for (const comment of comments) {
+        if (comment?.kind === "more") continue;
+
         const body = String(comment?.data?.body ?? "");
         if (!body) continue;
 
-        const lines = body.split("\n").map((l: string) => l.trim().toLowerCase());
-        const application = lines.find((l: string) => l.includes("application"));
-        const biometric = lines.find((l: string) => l.includes("biometric"));
-        const approval = lines.find((l: string) => l.includes("approval"));
-        if (!application || !biometric) continue;
+        const lines = body.split("\n");
+        const bodyLower = body.toLowerCase();
 
-        const applicationDate = extractDate(application);
-        const biometricDate = extractDate(biometric);
-        const approvalDate = approval ? extractDate(approval) : null;
+        const applicationLine = lineWithMilestoneDate(lines, [
+          /application\s*date/,
+          /date\s*of\s*application/,
+          /application\s*submitted/,
+          /submitted\s*(on|:)/,
+        ]);
+        const biometricLine = lineWithMilestoneDate(lines, [
+          /biometric\s*date/,
+          /biometrics?\s*:/,
+          /biometrics?\s*appointment/,
+          /biometrics?\s*done/,
+          /biometric\s*enrolment/,
+        ]);
+        if (!applicationLine || !biometricLine) continue;
+
+        const applicationDate = extractDate(applicationLine);
+        const biometricDate = extractDate(biometricLine);
         if (!applicationDate || !biometricDate) continue;
+
+        const approvalLine = lineWithMilestoneDate(lines, [
+          /approval\s*date/,
+          /approved\s*on/,
+          /decision\s*date/,
+          /(?:^|\s)approved\s*[:\-]/,
+        ]);
+        const approvalDate = approvalLine ? extractDate(approvalLine) : null;
 
         const permalink = String(comment?.data?.permalink ?? "");
         if (!permalink) continue;
@@ -72,11 +132,11 @@ export async function POST() {
 
         await prisma.timelineEntry.create({
           data: {
-            applicationMethod: body.includes("post") ? "POST" : "ONLINE",
+            applicationMethod: inferApplicationMethod(bodyLower, lines),
             applicationDate,
             biometricDate,
             approvalDate,
-            receivedHomeOfficeEmail: body.includes("home office email"),
+            receivedHomeOfficeEmail: bodyLower.includes("home office email"),
             status: approvalDate ? "APPROVED" : "BIOMETRICS_DONE",
             sourceType: "REDDIT",
             sourceReference,
@@ -90,8 +150,8 @@ export async function POST() {
         where: { id: config.id },
         data: { lastSyncedAt: new Date() },
       });
-    } catch {
-      // Keep sync resilient across multiple configured threads.
+    } catch (err) {
+      console.error("Reddit sync thread failed", config.postUrl, err);
     }
   }
 
