@@ -1,5 +1,3 @@
-import { ProxyAgent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from "undici";
-
 type RedditThing = {
   kind?: string;
   data?: Record<string, unknown> & {
@@ -37,53 +35,6 @@ export type RedditThreadFetchResult =
       error: string;
       bodySnippet?: string;
     };
-
-/** Which env var supplies the proxy URL (never log the URL). */
-export type RedditProxyEnvSource = "REDDIT_HTTPS_PROXY" | "HTTPS_PROXY" | "HTTP_PROXY";
-
-export function redditOutboundProxyEnv(): RedditProxyEnvSource | null {
-  if (process.env.REDDIT_HTTPS_PROXY?.trim()) return "REDDIT_HTTPS_PROXY";
-  if (process.env.HTTPS_PROXY?.trim()) return "HTTPS_PROXY";
-  if (process.env.HTTP_PROXY?.trim()) return "HTTP_PROXY";
-  return null;
-}
-
-function redditOutboundProxyUrl(): string | undefined {
-  return (
-    process.env.REDDIT_HTTPS_PROXY?.trim() ||
-    process.env.HTTPS_PROXY?.trim() ||
-    process.env.HTTP_PROXY?.trim()
-  );
-}
-
-let cachedProxyAgent: ProxyAgent | null = null;
-
-function getProxyAgent(): ProxyAgent | null {
-  const url = redditOutboundProxyUrl();
-  if (!url) {
-    cachedProxyAgent = null;
-    return null;
-  }
-  if (!cachedProxyAgent) {
-    cachedProxyAgent = new ProxyAgent(url);
-  }
-  return cachedProxyAgent;
-}
-
-async function redditFetch(url: string, init?: RequestInit): Promise<Response> {
-  const agent = getProxyAgent();
-  if (agent) {
-    const merged: UndiciRequestInit = {
-      ...(init as UndiciRequestInit | undefined),
-      dispatcher: agent,
-    };
-    if (merged.body === null) {
-      delete merged.body;
-    }
-    return undiciFetch(url, merged) as unknown as Response;
-  }
-  return fetch(url, init);
-}
 
 function getReplyChildren(replies: unknown): unknown[] | null {
   if (replies === "" || replies == null) return null;
@@ -178,7 +129,7 @@ async function postMoreChildren(
   });
   const h = new Headers(baseHeaders);
   h.set("Content-Type", "application/x-www-form-urlencoded");
-  const res = await redditFetch("https://www.reddit.com/api/morechildren.json?raw_json=1", {
+  const res = await fetch("https://www.reddit.com/api/morechildren.json?raw_json=1", {
     method: "POST",
     headers: h,
     body,
@@ -207,21 +158,17 @@ export async function fetchRedditThreadComments(
   const delayMs = options?.delayMs ?? 120;
 
   const jsonUrl = redditThreadJsonUrl(postUrl);
-  const response = await redditFetch(jsonUrl, { headers, cache: "no-store" });
+  const response = await fetch(jsonUrl, { headers, cache: "no-store" });
   const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
 
   if (!response.ok) {
-    const blockedHint =
-      response.status === 403
-        ? " Reddit often returns 403 for datacenter/hosting IPs. Set REDDIT_HTTPS_PROXY to an HTTP(S) proxy that exits from a residential or unblocked network, or run sync from elsewhere."
-        : "";
     return {
       ok: false,
       requestUrl: jsonUrl,
       httpStatus: response.status,
       contentType,
-      error: `HTTP ${response.status} from Reddit.${blockedHint}`,
+      error: `HTTP ${response.status} from Reddit`,
       bodySnippet: text.slice(0, 200),
     };
   }
