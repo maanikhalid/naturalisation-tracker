@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function redditFetchHeaders(): HeadersInit {
+  const ua =
+    process.env.REDDIT_USER_AGENT?.trim() ||
+    "naturalisation-tracker/0.1 (UK naturalisation timeline aggregator; contact via site)";
+  const headers: Record<string, string> = { "User-Agent": ua };
+  const token = process.env.REDDIT_ACCESS_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 function extractDate(raw: string): Date | null {
   const match = raw.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
   if (!match) return null;
@@ -27,7 +39,7 @@ export async function POST() {
         : `${config.postUrl.replace(/\/$/, "")}.json`;
 
       const response = await fetch(url, {
-        headers: { "User-Agent": "naturalisation-tracker-bot/0.1" },
+        headers: redditFetchHeaders(),
         cache: "no-store",
       });
       if (!response.ok) continue;
@@ -50,6 +62,14 @@ export async function POST() {
         const approvalDate = approval ? extractDate(approval) : null;
         if (!applicationDate || !biometricDate) continue;
 
+        const permalink = String(comment?.data?.permalink ?? "");
+        if (!permalink) continue;
+        const sourceReference = `https://reddit.com${permalink}`;
+        const existing = await prisma.timelineEntry.findFirst({
+          where: { sourceType: "REDDIT", sourceReference },
+        });
+        if (existing) continue;
+
         await prisma.timelineEntry.create({
           data: {
             applicationMethod: body.includes("post") ? "POST" : "ONLINE",
@@ -59,7 +79,7 @@ export async function POST() {
             receivedHomeOfficeEmail: body.includes("home office email"),
             status: approvalDate ? "APPROVED" : "BIOMETRICS_DONE",
             sourceType: "REDDIT",
-            sourceReference: `https://reddit.com${comment?.data?.permalink ?? ""}`,
+            sourceReference,
             isVerified: false,
           },
         });

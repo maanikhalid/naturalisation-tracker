@@ -61,6 +61,13 @@ export function AdminDashboard({
     setMessage(response.ok ? `Imported ${data.imported} entries.` : "Reddit sync failed.");
   }
 
+  async function removeRedditConfig(id: string, label: string) {
+    if (!window.confirm(`Remove this tracked thread from the list?\n\n${label}`)) return;
+    const response = await fetch(`/api/admin/reddit-config/${id}`, { method: "DELETE" });
+    setMessage(response.ok ? "Thread removed from tracking." : "Could not remove thread.");
+    if (response.ok) window.location.reload();
+  }
+
   return (
     <div>
       <section className="govuk-!-margin-bottom-9">
@@ -84,10 +91,19 @@ export function AdminDashboard({
         {message && <p className="govuk-body">{message}</p>}
         <ul className="govuk-list govuk-list--bullet">
           {configs.map((c) => (
-            <li key={c.id}>
-              {c.postUrl} - every {c.syncIntervalMins} mins -{" "}
-              {c.active ? "active" : "inactive"} - last sync:{" "}
-              {c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString("en-GB") : "never"}
+            <li key={c.id} className="govuk-!-margin-bottom-2">
+              <span className="govuk-body">
+                {c.postUrl} - every {c.syncIntervalMins} mins -{" "}
+                {c.active ? "active" : "inactive"} - last sync:{" "}
+                {c.lastSyncedAt ? new Date(c.lastSyncedAt).toLocaleString("en-GB") : "never"}
+              </span>{" "}
+              <button
+                type="button"
+                className="govuk-button govuk-button--warning govuk-!-margin-bottom-0"
+                onClick={() => void removeRedditConfig(c.id, c.postUrl)}
+              >
+                Remove thread
+              </button>
             </li>
           ))}
         </ul>
