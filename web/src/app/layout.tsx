@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "UK Naturalisation Tracker",
@@ -18,40 +17,51 @@ export default function RootLayout({
       <body>
         <header className="govuk-header" role="banner">
           <div className="govuk-header__container govuk-width-container">
+            <div className="govuk-header__logo">
+              <Link
+                href="/"
+                className="govuk-header__link govuk-header__link--homepage"
+                aria-label="Naturalisation Tracker home"
+              >
+                <span className="govuk-header__logotype-text">GOV.UK</span>
+              </Link>
+            </div>
             <div className="govuk-header__content">
-              <Link href="/" className="govuk-header__link govuk-header__link--service-name">
+              <Link
+                href="/"
+                className="govuk-header__link govuk-header__link--service-name"
+              >
                 Naturalisation Tracker
               </Link>
-              <nav>
-                <ul className="govuk-list">
-                  <li>
-                    <Link href="/" className="govuk-link">
+              <nav aria-label="Primary navigation">
+                <ul className="govuk-header__navigation">
+                  <li className="govuk-header__navigation-item">
+                    <Link href="/" className="govuk-header__link">
                       Dashboard
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/submit" className="govuk-link">
+                  <li className="govuk-header__navigation-item">
+                    <Link href="/submit" className="govuk-header__link">
                       Submit
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/data" className="govuk-link">
+                  <li className="govuk-header__navigation-item">
+                    <Link href="/data" className="govuk-header__link">
                       Data explorer
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/about" className="govuk-link">
+                  <li className="govuk-header__navigation-item">
+                    <Link href="/about" className="govuk-header__link">
                       About
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/admin" className="govuk-link">
+                  <li className="govuk-header__navigation-item">
+                    <Link href="/admin" className="govuk-header__link">
                       Admin
                     </Link>
                   </li>
                 </ul>
               </nav>
-              <ThemeToggle />
             </div>
           </div>
         </header>
