@@ -1,76 +1,80 @@
 @import "tailwindcss";
 @import "govuk-frontend/dist/govuk/govuk-frontend.min.css";
 
-/* Grift (replacing GDS Transport — not licensed for this site). Arial as fallback. */
+/* Helvena (replacing GDS Transport — not licensed for this site). Arial as fallback. */
 @font-face {
-  font-family: Grift;
+  font-family: Helvena;
+  font-style: normal;
+  font-weight: 200;
+  src: url("/font/Web-TT/Helvena-Extralight.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Helvena;
+  font-style: normal;
+  font-weight: 300;
+  src: url("/font/Web-TT/Helvena-Light.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Helvena;
   font-style: normal;
   font-weight: 400;
-  src:
-    url("/font/Web-TT/Grift-Regular.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-Regular.woff") format("woff");
+  src: url("/font/Web-TT/Helvena-Regular.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: Grift;
-  font-style: italic;
-  font-weight: 400;
-  src:
-    url("/font/Web-TT/Grift-Italic.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-Italic.woff") format("woff");
-  font-display: swap;
-}
-
-@font-face {
-  font-family: Grift;
+  font-family: Helvena;
   font-style: normal;
   font-weight: 500;
-  src:
-    url("/font/Web-TT/Grift-Medium.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-Medium.woff") format("woff");
+  src: url("/font/Web-TT/Helvena-Medium.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: Grift;
+  font-family: Helvena;
   font-style: normal;
   font-weight: 600;
-  src:
-    url("/font/Web-TT/Grift-SemiBold.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-SemiBold.woff") format("woff");
+  src: url("/font/Web-TT/Helvena-Semibold.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: Grift;
+  font-family: Helvena;
   font-style: normal;
   font-weight: 700;
-  src:
-    url("/font/Web-TT/Grift-Bold.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-Bold.woff") format("woff");
+  src: url("/font/Web-TT/Helvena-Bold.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: Grift;
-  font-style: italic;
-  font-weight: 700;
-  src:
-    url("/font/Web-TT/Grift-BoldItalic.woff2") format("woff2"),
-    url("/font/Web-TT/Grift-BoldItalic.woff") format("woff");
+  font-family: Helvena;
+  font-style: normal;
+  font-weight: 800;
+  src: url("/font/Web-TT/Helvena-Extrabold.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Helvena;
+  font-style: normal;
+  font-weight: 900;
+  src: url("/font/Web-TT/Helvena-Black.woff2") format("woff2");
   font-display: swap;
 }
 
 body {
   margin: 0;
   background: #f8f8f8;
-  font-family: Grift, Arial, sans-serif;
+  font-family: Helvena, Arial, sans-serif;
 }
 
 /* GOV.UK Frontend hardcodes "GDS Transport" on many components */
 [class*="govuk-"] {
-  font-family: Grift, Arial, sans-serif !important;
+  font-family: Helvena, Arial, sans-serif !important;
 }
 
 pre,
