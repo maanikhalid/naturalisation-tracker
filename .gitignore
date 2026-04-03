@@ -28,6 +28,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# server-only Plesk deploy path overrides (never commit)
+.plesk-node-env.sh
+
 # vercel
 .vercel
 

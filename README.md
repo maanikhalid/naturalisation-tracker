@@ -86,6 +86,14 @@ bash scripts/plesk-post-deploy.sh
 
 The script exports a sane `PATH` (including `/usr/bin` and common `/opt/plesk/node/*/bin` locations), then runs `npm ci`, Prisma generate/push, and `npm run build` under `web/`.
 
+**If the hook user cannot access `/opt/plesk/node`** (empty `ls` / `find` in the deploy log), fix **permissions on the server** (as root), e.g. ensure the subscription user can traverse and execute under `/opt/plesk/node/VERSION/bin`, **or** create **`naturalisation-tracker/.plesk-node-env.sh`** on the server (not in git; ignored) after checking paths over SSH:
+
+```bash
+export NODE_BIN=/usr/bin/node
+export NPM_CLI=/usr/lib/node_modules/npm/bin/npm-cli.js
+# or: export NPM=/path/to/npm
+```
+
 **If `npm` is still not found in the hook**, use absolute `npm` / `npm --prefix` (replace paths with yours):
 
 ```bash
