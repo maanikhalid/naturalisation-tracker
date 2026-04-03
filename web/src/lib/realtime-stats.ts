@@ -16,6 +16,19 @@ function medianDays(values: number[]): number | null {
     : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/** Linear interpolation; `p` in [0, 100]. */
+function percentileLinear(sortedAsc: number[], p: number): number {
+  if (!sortedAsc.length) return NaN;
+  if (sortedAsc.length === 1) return sortedAsc[0];
+  const rank = (p / 100) * (sortedAsc.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  if (lo === hi) return sortedAsc[lo];
+  return (
+    sortedAsc[lo] + (sortedAsc[hi] - sortedAsc[lo]) * (rank - lo)
+  );
+}
+
 function formatRangeShort(a: dayjs.Dayjs, b: dayjs.Dayjs): string {
   const sameMonth = a.month() === b.month() && a.year() === b.year();
   if (sameMonth) {
@@ -59,6 +72,11 @@ type BinAgg = {
  * submit cohort (10-day band) is actively clearing (high processed share) but not
  * finished — same idea as the spreadsheet frontier table.
  */
+/** At most this many decadal bins (from the newest) define the frontier window. */
+const FRONTIER_MAX_BINS = 2;
+const FRONTIER_PENDING_P_LOW = 35;
+const FRONTIER_PENDING_P_HIGH = 65;
+
 function expectApprovalsApplicationDateRange(
   rows: RealtimeStatsInput[],
   opts: { minTotal: number; minRate: number; maxRate: number }
@@ -128,16 +146,30 @@ function expectApprovalsApplicationDateRange(
 
   if (!streak.length) return null;
 
+  const cappedStreak =
+    streak.length > FRONTIER_MAX_BINS
+      ? streak.slice(-FRONTIER_MAX_BINS)
+      : streak;
+
   const millis: number[] = [];
-  for (const start of streak) {
+  for (const start of cappedStreak) {
     const b = map.get(start.format("YYYY-MM-DD"))!;
     millis.push(...b.pendingAppMillis);
   }
   if (!millis.length) return null;
 
+  const sorted = [...millis].sort((a, b) => a - b);
+  let low = percentileLinear(sorted, FRONTIER_PENDING_P_LOW);
+  let high = percentileLinear(sorted, FRONTIER_PENDING_P_HIGH);
+  if (low > high) [low, high] = [high, low];
+  if (sorted.length < 4) {
+    low = sorted[0];
+    high = sorted[sorted.length - 1];
+  }
+
   return {
-    min: dayjs(Math.min(...millis)),
-    max: dayjs(Math.max(...millis)),
+    min: dayjs(low),
+    max: dayjs(high),
   };
 }
 
@@ -158,9 +190,9 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
 
   let expectApprovalsLabel: string | null = null;
   const frontier = expectApprovalsApplicationDateRange(rows, {
-    minTotal: 5,
-    minRate: 0.15,
-    maxRate: 0.995,
+    minTotal: 7,
+    minRate: 0.22,
+    maxRate: 0.98,
   });
   if (frontier) {
     expectApprovalsLabel = formatRangeShort(frontier.min, frontier.max);

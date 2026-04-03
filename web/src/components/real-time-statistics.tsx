@@ -30,10 +30,9 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
             Who can expect approvals?
           </p>
           <p className="govuk-body-s realtime-stats__hint govuk-!-margin-bottom-2">
-            Range of <strong>application submission dates</strong> for people still
-            waiting in the cohorts that are actively clearing (10-day bands with
-            meaningful approvals but not finished). Matches the spreadsheet-style
-            processing frontier.
+            <strong>Application submission dates</strong> (central band: 35th–65th
+            percentile among pending) in at most the two newest clearing 10-day
+            cohorts — stricter than full min/max.
           </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.expectApprovalsLabel ?? "Insufficient data"}
