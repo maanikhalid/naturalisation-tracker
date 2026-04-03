@@ -30,9 +30,10 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
             Who can expect approvals?
           </p>
           <p className="govuk-body-s realtime-stats__hint govuk-!-margin-bottom-2">
-            Each pending case uses the median app-to-approval time of{" "}
-            <strong>approved</strong> submissions from the same application month,
-            widening by month up to ±6 months if there are fewer than three peers.
+            Range of <strong>application submission dates</strong> for people still
+            waiting in the cohorts that are actively clearing (10-day bands with
+            meaningful approvals but not finished). Matches the spreadsheet-style
+            processing frontier.
           </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.expectApprovalsLabel ?? "Insufficient data"}

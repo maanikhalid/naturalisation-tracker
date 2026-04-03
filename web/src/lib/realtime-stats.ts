@@ -24,72 +24,125 @@ function formatRangeShort(a: dayjs.Dayjs, b: dayjs.Dayjs): string {
   return `est. ${a.format("D MMM.")} - ${b.format("D MMM. YYYY")}`;
 }
 
-function approvalDurations(approved: RealtimeStatsInput[]): number[] {
-  return approved.map((e) =>
-    dayjs(e.approvalDate!).diff(e.applicationDate, "day")
-  );
+/** Start of the decadal application-date bin (1–10, 11–20, 21–end), like the spreadsheet. */
+function applicationDecadeBinStart(d: Date): dayjs.Dayjs {
+  const x = dayjs(d).startOf("day");
+  const dom = x.date();
+  if (dom <= 10) return x.date(1);
+  if (dom <= 20) return x.date(11);
+  return x.date(21);
 }
 
-/** Months between two calendar months (signed). */
-function monthDeltaFromCalendar(
-  a: dayjs.Dayjs,
-  b: dayjs.Dayjs
-): number {
-  return (a.year() - b.year()) * 12 + (a.month() - b.month());
+function applicationDecadeBinEnd(start: dayjs.Dayjs): dayjs.Dayjs {
+  const dom = start.date();
+  if (dom === 1) return start.date(10);
+  if (dom === 11) return start.date(20);
+  return start.endOf("month").startOf("day");
 }
+
+function decadeBinsConsecutive(
+  earlierBinStart: dayjs.Dayjs,
+  laterBinStart: dayjs.Dayjs
+): boolean {
+  const gapStart = applicationDecadeBinEnd(earlierBinStart).add(1, "day");
+  return laterBinStart.isSame(gapStart, "day");
+}
+
+type BinAgg = {
+  approved: number;
+  pending: number;
+  pendingAppMillis: number[];
+};
 
 /**
- * Durations for approved rows whose application date falls in the same
- * calendar month as `center`, or within +/- `spanMonths` of that month.
+ * Application-date range for "who can expect approvals": pending applicants whose
+ * submit cohort (10-day band) is actively clearing (high processed share) but not
+ * finished — same idea as the spreadsheet frontier table.
  */
-function cohortDurationsBySubmitWindow(
-  pendingApplicationDate: Date,
-  approved: RealtimeStatsInput[],
-  spanMonths: number
-): number[] {
-  const center = dayjs(pendingApplicationDate).startOf("month");
-  const out: number[] = [];
-  for (const e of approved) {
-    const app = dayjs(e.applicationDate).startOf("month");
-    if (Math.abs(monthDeltaFromCalendar(app, center)) <= spanMonths) {
-      out.push(dayjs(e.approvalDate!).diff(e.applicationDate, "day"));
-    }
-  }
-  return out;
-}
-
-const COHORT_MIN_SAMPLES = 3;
-const COHORT_MAX_MONTH_SPAN = 6;
-
-/**
- * Median app-to-approval days for people who submitted around the same time
- * as this pending case (expanding month window), else all approved.
- */
-function medianWaitForSubmitCohort(
-  pendingApplicationDate: Date,
-  approved: RealtimeStatsInput[]
-): number | null {
-  if (!approved.length) return null;
-  for (let span = 0; span <= COHORT_MAX_MONTH_SPAN; span++) {
-    const durs = cohortDurationsBySubmitWindow(
-      pendingApplicationDate,
-      approved,
-      span
+function expectApprovalsApplicationDateRange(
+  rows: RealtimeStatsInput[],
+  opts: { minTotal: number; minRate: number; maxRate: number }
+): { min: dayjs.Dayjs; max: dayjs.Dayjs } | null {
+  const map = new Map<string, BinAgg>();
+  for (const e of rows) {
+    const key = applicationDecadeBinStart(e.applicationDate).format(
+      "YYYY-MM-DD"
     );
-    if (durs.length >= COHORT_MIN_SAMPLES) return medianDays(durs);
+    const b = map.get(key) ?? {
+      approved: 0,
+      pending: 0,
+      pendingAppMillis: [],
+    };
+    if (e.approvalDate) b.approved += 1;
+    else {
+      b.pending += 1;
+      b.pendingAppMillis.push(dayjs(e.applicationDate).valueOf());
+    }
+    map.set(key, b);
   }
-  const lastWindow = cohortDurationsBySubmitWindow(
-    pendingApplicationDate,
-    approved,
-    COHORT_MAX_MONTH_SPAN
+
+  const binStarts = [...map.keys()]
+    .map((k) => dayjs(k).startOf("day"))
+    .sort((a, b) => a.valueOf() - b.valueOf());
+
+  const qualified = (minTotal: number, minRate: number, maxRate: number) => {
+    const set = new Set<string>();
+    for (const start of binStarts) {
+      const key = start.format("YYYY-MM-DD");
+      const b = map.get(key)!;
+      const total = b.approved + b.pending;
+      if (total < minTotal || b.pending < 1) continue;
+      const rate = b.approved / total;
+      if (rate >= minRate && rate < maxRate) set.add(key);
+    }
+    return set;
+  };
+
+  const findStreak = (set: Set<string>) => {
+    if (!set.size) return [] as dayjs.Dayjs[];
+    let right = -1;
+    for (let i = binStarts.length - 1; i >= 0; i--) {
+      if (set.has(binStarts[i].format("YYYY-MM-DD"))) {
+        right = i;
+        break;
+      }
+    }
+    if (right < 0) return [];
+    let left = right;
+    while (
+      left > 0 &&
+      set.has(binStarts[left - 1].format("YYYY-MM-DD")) &&
+      decadeBinsConsecutive(binStarts[left - 1], binStarts[left])
+    ) {
+      left -= 1;
+    }
+    return binStarts.slice(left, right + 1);
+  };
+
+  let streak = findStreak(
+    qualified(opts.minTotal, opts.minRate, opts.maxRate)
   );
-  if (lastWindow.length > 0) return medianDays(lastWindow);
-  return medianDays(approvalDurations(approved));
+  if (!streak.length) {
+    streak = findStreak(qualified(3, 0.08, opts.maxRate));
+  }
+
+  if (!streak.length) return null;
+
+  const millis: number[] = [];
+  for (const start of streak) {
+    const b = map.get(start.format("YYYY-MM-DD"))!;
+    millis.push(...b.pendingAppMillis);
+  }
+  if (!millis.length) return null;
+
+  return {
+    min: dayjs(Math.min(...millis)),
+    max: dayjs(Math.max(...millis)),
+  };
 }
 
 export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
   const approved = rows.filter((e) => e.approvalDate);
-  const pending = rows.filter((e) => !e.approvalDate);
 
   const last30BySubmitDate = [...approved]
     .sort(
@@ -103,35 +156,14 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
   );
   const medianWaitLast30 = medianDays(last30Durations);
 
-  const allDurations = approvalDurations(approved);
-  const medianFallback = medianDays(allDurations);
-  const medianForProjection = medianWaitLast30 ?? medianFallback;
-
   let expectApprovalsLabel: string | null = null;
-  if (pending.length && approved.length) {
-    const estimates: dayjs.Dayjs[] = [];
-    for (const e of pending) {
-      const cohortMedian = medianWaitForSubmitCohort(
-        e.applicationDate,
-        approved
-      );
-      if (cohortMedian != null && cohortMedian > 0) {
-        estimates.push(dayjs(e.applicationDate).add(cohortMedian, "day"));
-      }
-    }
-    if (estimates.length) {
-      const ts = estimates.map((d) => d.valueOf());
-      const min = dayjs(Math.min(...ts));
-      const max = dayjs(Math.max(...ts));
-      expectApprovalsLabel = formatRangeShort(min, max);
-    }
-  } else if (medianForProjection != null && medianForProjection > 0) {
-    if (!pending.length) {
-      const centre = dayjs().add(medianForProjection, "day");
-      const min = centre.subtract(4, "day");
-      const max = centre.add(4, "day");
-      expectApprovalsLabel = formatRangeShort(min, max);
-    }
+  const frontier = expectApprovalsApplicationDateRange(rows, {
+    minTotal: 5,
+    minRate: 0.15,
+    maxRate: 0.995,
+  });
+  if (frontier) {
+    expectApprovalsLabel = formatRangeShort(frontier.min, frontier.max);
   }
 
   let latestAppDateAmongApproved: {
