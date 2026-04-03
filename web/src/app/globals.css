@@ -28,6 +28,81 @@ body {
   margin: 0;
 }
 
+/* Compact header: title + right menu dropdown, max 61px bar height */
+.app-site-header {
+  padding: 0;
+  box-sizing: border-box;
+  border-bottom: 2px solid #1d70b8;
+}
+
+.app-site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-height: 61px;
+  min-height: 0;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  box-sizing: border-box;
+}
+
+.app-site-header__title {
+  margin: 0;
+  padding: 0;
+  line-height: 1.25;
+  font-size: 1.5rem;
+}
+
+@media (max-width: 40.0625em) {
+  .app-site-header__title {
+    font-size: 1.25rem;
+  }
+}
+
+.app-site-header__menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.app-site-header__menu-button {
+  margin-bottom: 0;
+  min-height: 38px;
+  padding: 0.25rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.app-site-header__dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  min-width: 12rem;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #b1b4b6;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.app-site-header__dropdown-item {
+  margin: 0;
+}
+
+.app-site-header__dropdown-link {
+  display: block;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  font-size: 1rem;
+}
+
+.app-site-header__dropdown-link:hover {
+  background: #f3f2f1;
+  text-decoration: underline;
+}
+
 .success-text {
   color: #00703c;
   font-weight: 700;
