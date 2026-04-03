@@ -5,6 +5,7 @@ set -euo pipefail
 # Runs from repository root.
 
 APP_DIR="web"
+STEP_TIMEOUT="20m"
 
 if [ ! -d "$APP_DIR" ]; then
   echo "Missing $APP_DIR directory in deployed repo."
@@ -31,16 +32,36 @@ fi
 
 cd "$APP_DIR"
 
+# Force non-interactive behavior in Plesk hooks.
+export CI=true
+export npm_config_yes=true
+export npm_config_audit=false
+export npm_config_fund=false
+exec </dev/null
+
+# Keep output flowing in Plesk logs.
+run_step() {
+  local label="$1"
+  shift
+  echo "==> $label"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$STEP_TIMEOUT" stdbuf -oL -eL "$@"
+  else
+    stdbuf -oL -eL "$@"
+  fi
+}
+
 echo "Installing dependencies..."
-npm ci --include=dev
+run_step "npm ci" npm ci --include=dev --no-audit --no-fund
 
 echo "Generating Prisma client..."
-npm run prisma:generate
+run_step "prisma generate" npm run prisma:generate
 
 echo "Applying Prisma schema to database..."
-npm run prisma:push
+run_step "prisma push" npm run prisma:push
 
 echo "Building Next.js app..."
-npm run build
+run_step "next build" npm run build
 
 echo "Deployment actions complete."
+exit 0
