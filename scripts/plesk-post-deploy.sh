@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 # Run with: bash scripts/plesk-post-deploy.sh (from repo root).
+#
+# Plesk note — chroot: If SSH is disabled for the subscription system user, Git
+# hooks often run in a CHROOT whose root is that user's home. Then /usr, /opt,
+# and Plesk's Node under /opt/plesk are NOT visible — only paths inside the
+# subscription (e.g. $HOME, httpdocs, this repo) exist. Use Node in $HOME (nvm,
+# fnm), repo-local tools, or .plesk-node-env.sh; or enable non-chroot SSH /
+# run builds outside this hook. See README "Plesk chroot".
 set -euo pipefail
 
-# Always use full paths to coreutils — Plesk hooks sometimes omit /usr/bin from PATH.
-LS=/usr/bin/ls
-FIND=/usr/bin/find
-HEAD=/usr/bin/head
-
-export PATH="/usr/bin:/bin:/usr/sbin:/usr/local/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:/opt/plesk/node/22/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:${PATH}"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Avoid external `dirname` (may be missing in minimal chroot).
+_script="${BASH_SOURCE[0]}"
+_sdir=${_script%/*}
+[[ "${_script}" == */* ]] || _sdir=.
+SCRIPT_DIR="$(cd "${_sdir}" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Optional override (create on server via SSH if auto-discovery fails):
-#   REPO_ROOT/.plesk-node-env.sh  →  export NPM=/path/to/npm
-#   or  export NODE_BIN=... NPM_CLI=...
+LS_CMD=$(command -v ls 2>/dev/null || echo /bin/ls)
+FIND_CMD=$(command -v find 2>/dev/null || true)
+HEAD_CMD=$(command -v head 2>/dev/null || true)
+
+# Optional override (create on server): REPO_ROOT/.plesk-node-env.sh
 if [[ -f "${REPO_ROOT}/.plesk-node-env.sh" ]]; then
   # shellcheck source=/dev/null
   source "${REPO_ROOT}/.plesk-node-env.sh"
@@ -31,7 +37,6 @@ try_node_cli() {
   "${nb}" "${cli}" --version >/dev/null 2>&1
 }
 
-# Validate optional override file
 if [[ -n "${NPM}" ]] && ! "${NPM}" --version >/dev/null 2>&1; then
   echo "Ignoring invalid NPM=${NPM} from .plesk-node-env.sh" >&2
   NPM=""
@@ -47,7 +52,39 @@ if [[ -n "${NODE_BIN}" && -n "${NPM_CLI}" ]]; then
   fi
 fi
 
-# 1) Prefer npm wrapper when the hook user can execute it.
+# PATH: chroot-safe first ($HOME), then typical non-chroot locations.
+export PATH="${REPO_ROOT}/tools/node/bin:${PATH}"
+if [[ -n "${HOME:-}" ]]; then
+  export PATH="${HOME}/.local/bin:${HOME}/bin:${PATH}"
+  # nvm installs per-version bins here (common workaround when /usr is not visible).
+  if [[ -d "${HOME}/.nvm/versions/node" ]]; then
+    shopt -s nullglob
+    for _nvbin in "${HOME}/.nvm/versions/node"/*/bin; do
+      export PATH="${_nvbin}:${PATH}"
+    done
+    shopt -u nullglob
+  fi
+fi
+export PATH="/usr/bin:/bin:/usr/sbin:/usr/local/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:/opt/plesk/node/22/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:${PATH}"
+
+# 0) After PATH includes $HOME, npm may resolve (nvm, etc.)
+if [[ -z "${NPM}" ]]; then
+  NPM=$(command -v npm 2>/dev/null || true)
+fi
+
+# 0b) Explicit nvm npm binaries
+if [[ -z "${NPM}" && -n "${HOME:-}" && -d "${HOME}/.nvm/versions/node" ]]; then
+  shopt -s nullglob
+  for _npm in "${HOME}/.nvm/versions/node"/*/bin/npm; do
+    if [[ -f "${_npm}" ]] && "${_npm}" --version >/dev/null 2>&1; then
+      NPM=${_npm}
+      break
+    fi
+  done
+  shopt -u nullglob
+fi
+
+# 1) System / Plesk paths (only work when NOT chrooted)
 if [[ -z "${NPM}" ]]; then
   for c in \
     /opt/plesk/node/25/bin/npm \
@@ -67,7 +104,7 @@ if [[ -z "${NPM}" ]]; then
   NPM=$(command -v npm 2>/dev/null || true)
 fi
 
-# 2) Fixed paths under /opt/plesk/node/* (skip if override already set pair).
+# 2) Fixed paths under /opt/plesk/node/*
 if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
   for nd in /opt/plesk/node/25 /opt/plesk/node/24 /opt/plesk/node/22 /opt/plesk/node/20; do
     cli="${nd}/lib/node_modules/npm/bin/npm-cli.js"
@@ -83,8 +120,8 @@ if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
   done
 fi
 
-# 3) Walk /opt/plesk/node for npm-cli.js
-if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && [[ -x "${FIND}" ]]; then
+# 3) find under /opt/plesk/node
+if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") && -n "${FIND_CMD}" && -x "${FIND_CMD}" ]]; then
   while IFS= read -r cli; do
     [[ -z "${cli}" ]] && continue
     nd="${cli%/lib/node_modules/npm/bin/npm-cli.js}"
@@ -98,10 +135,10 @@ if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && [[ -x "${FIND}"
         break 2
       fi
     done
-  done < <("${FIND}" /opt/plesk/node -name npm-cli.js -type f 2>/dev/null | "${HEAD}" -30)
+  done < <("${FIND_CMD}" /opt/plesk/node -name npm-cli.js -type f 2>/dev/null | "${HEAD_CMD:-head}" -30)
 fi
 
-# 4) Debian/Ubuntu system layout + find under /usr/lib
+# 4) Debian system layout
 if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
   for nb in /usr/bin/node /usr/bin/nodejs /usr/local/bin/node; do
     for cli in \
@@ -120,7 +157,7 @@ if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
   done
 fi
 
-if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && [[ -x "${FIND}" ]]; then
+if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") && -n "${FIND_CMD}" && -x "${FIND_CMD}" ]]; then
   while IFS= read -r cli; do
     [[ -z "${cli}" ]] && continue
     for nb in /usr/bin/node /usr/bin/nodejs /usr/local/bin/node; do
@@ -132,7 +169,7 @@ if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && [[ -x "${FIND}"
         break 2
       fi
     done
-  done < <("${FIND}" /usr/lib /usr/local/lib -maxdepth 8 -name npm-cli.js -type f 2>/dev/null | "${HEAD}" -20)
+  done < <("${FIND_CMD}" /usr/lib /usr/local/lib -maxdepth 8 -name npm-cli.js -type f 2>/dev/null | "${HEAD_CMD:-head}" -20)
 fi
 
 run_npm() {
@@ -141,17 +178,13 @@ run_npm() {
   elif [[ -n "${NODE_BIN}" && -n "${NPM_CLI}" ]]; then
     "${NODE_BIN}" "${NPM_CLI}" "$@"
   else
-    echo "npm not found. id=$(id 2>/dev/null)" >&2
-    echo "--- ls /opt/plesk (permission?) ---" >&2
-    "${LS}" -la /opt 2>&1 || true
-    "${LS}" -la /opt/plesk 2>&1 || true
-    "${LS}" -la /opt/plesk/node 2>&1 || true
-    "${LS}" -la /opt/plesk/node/25/bin 2>&1 || true
-    "${LS}" -la /opt/plesk/node/24/bin 2>&1 || true
-    echo "--- find npm-cli.js ---" >&2
-    "${FIND}" /opt/plesk/node -name npm-cli.js -type f 2>/dev/null | "${HEAD}" -20 >&2 || true
-    "${FIND}" /usr/lib /usr/local/lib -maxdepth 8 -name npm-cli.js -type f 2>/dev/null | "${HEAD}" -20 >&2 || true
-    echo "--- hint: create ${REPO_ROOT}/.plesk-node-env.sh with NPM= or NODE_BIN= + NPM_CLI= ---" >&2
+    echo "npm not found. id=$(id 2>/dev/null) HOME=${HOME:-} pwd=${PWD}" >&2
+    echo "--- Plesk chroot: if SSH is off for this user, /usr and /opt are usually invisible. See README. ---" >&2
+    "${LS_CMD}" -la . 2>&1 || true
+    "${LS_CMD}" -la "${HOME:-.}" 2>&1 || true
+    "${LS_CMD}" -la /opt 2>&1 || true
+    "${LS_CMD}" -la /usr/bin/npm 2>&1 || true
+    echo "--- hint: install Node via nvm in HOME, or set ${REPO_ROOT}/.plesk-node-env.sh ---" >&2
     exit 1
   fi
 }

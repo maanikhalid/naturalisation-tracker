@@ -76,25 +76,43 @@ DATABASE_URL="mysql://db_user:db_password@localhost:3306/db_name"
 
 ### 3) Git deployment actions
 
-Plesk may invoke hooks with `sh`, which breaks bash-only options and differs from your SSH session. **Call bash explicitly** and run from the **repository root**.
+#### Plesk chroot (SSH disabled for the system user)
 
-**Recommended — repo script**
+If **SSH is disabled** (or restricted) for the subscription’s system user, Plesk may run Git **Additional deployment actions** inside a **chroot** whose root is that user’s home. In that environment:
+
+- Paths like `/usr/bin`, `/opt/plesk`, and **Plesk’s Node** are often **outside the jail** and **cannot be executed**.
+- Only files under the subscription (e.g. `httpdocs`, home dotfiles) are reliably available.
+
+So the same script that works in an interactive SSH session as root can fail in the hook with **“npm not found”** even though Node exists on the server.
+
+**Practical options:**
+
+1. **Allow SSH without chroot** for that subscription (Plesk / host policy), so hooks see the real filesystem; or run deploy commands over full SSH instead of the Git hook.
+2. Install **Node/npm inside the jail**, e.g. **nvm** under `$HOME` (`~/.nvm/.../bin/npm`). The deploy script prepends those paths first.
+3. Put a **`.plesk-node-env.sh`** in the repo root on the server (gitignored) with `NPM=...` or `NODE_BIN=` + `NPM_CLI=` pointing to binaries **inside** the subscription.
+4. **Build elsewhere** (CI) and deploy artifacts, and keep the hook minimal (no `npm` on server).
+
+#### Command
+
+Plesk may invoke hooks with `sh`. **Call bash explicitly** from the **repository root**:
 
 ```bash
 bash scripts/plesk-post-deploy.sh
 ```
 
-The script exports a sane `PATH` (including `/usr/bin` and common `/opt/plesk/node/*/bin` locations), then runs `npm ci`, Prisma generate/push, and `npm run build` under `web/`.
+The script tries, in order: **`$HOME` / nvm**, optional **`.plesk-node-env.sh`**, then normal **`/opt/plesk`** and **`/usr`** paths (when not chrooted), then runs `npm ci`, Prisma generate/push, and `npm run build` under `web/`.
 
-**If the hook user cannot access `/opt/plesk/node`** (empty `ls` / `find` in the deploy log), fix **permissions on the server** (as root), e.g. ensure the subscription user can traverse and execute under `/opt/plesk/node/VERSION/bin`, **or** create **`naturalisation-tracker/.plesk-node-env.sh`** on the server (not in git; ignored) after checking paths over SSH:
+**Server-only override** (not in git; path is in `.gitignore`):
 
 ```bash
-export NODE_BIN=/usr/bin/node
-export NPM_CLI=/usr/lib/node_modules/npm/bin/npm-cli.js
-# or: export NPM=/path/to/npm
+# naturalisation-tracker/.plesk-node-env.sh — paths must exist inside chroot if applicable
+export NPM=/path/to/npm
+# or:
+# export NODE_BIN=/path/to/node
+# export NPM_CLI=/path/to/npm-cli.js
 ```
 
-**If `npm` is still not found in the hook**, use absolute `npm` / `npm --prefix` (replace paths with yours):
+**Non-chroot one-liner** (replace domain and paths; useless inside a strict chroot):
 
 ```bash
 PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web ci --include=dev --no-audit --no-fund && PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web run build
