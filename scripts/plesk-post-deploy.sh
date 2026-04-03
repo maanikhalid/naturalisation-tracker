@@ -23,32 +23,60 @@ if [[ -z "${NPM}" ]]; then
   NPM=$(command -v npm 2>/dev/null || true)
 fi
 
-# 2) If the npm script is not runnable (common for vhost UIDs), use node + npm-cli.js from the same prefix.
 NODE_BIN=""
 NPM_CLI=""
+
+try_node_cli() {
+  local nb=$1
+  local cli=$2
+  [[ -f "${nb}" && -f "${cli}" ]] || return 1
+  # Real check: npm-cli must respond (node --version alone is not enough).
+  "${nb}" "${cli}" --version >/dev/null 2>&1
+}
+
+# 2) Fixed paths under /opt/plesk/node/*
 if [[ -z "${NPM}" ]]; then
   for nd in /opt/plesk/node/25 /opt/plesk/node/24 /opt/plesk/node/22 /opt/plesk/node/20; do
-    nb="${nd}/bin/node"
     cli="${nd}/lib/node_modules/npm/bin/npm-cli.js"
-    if [[ -f "${nb}" && -f "${cli}" ]] && "${nb}" --version >/dev/null 2>&1; then
-      NODE_BIN=${nb}
-      NPM_CLI=${cli}
-      echo "Using npm-cli via node: ${NODE_BIN} ${NPM_CLI}"
-      export PATH="${NODE_BIN%/*}:${PATH}"
-      break
-    fi
+    for nb in "${nd}/bin/node" "${nd}/bin/nodejs"; do
+      if try_node_cli "${nb}" "${cli}"; then
+        NODE_BIN=${nb}
+        NPM_CLI=${cli}
+        echo "Using npm-cli via node: ${NODE_BIN} ${NPM_CLI}"
+        export PATH="${NODE_BIN%/*}:${PATH}"
+        break 2
+      fi
+    done
   done
 fi
 
-# 3) Debian/Ubuntu system layout (node + global npm-cli).
+# 3) Discover layout — Plesk/OS builds differ; walk any npm-cli.js under /opt/plesk/node.
+if [[ -z "${NPM}" && -z "${NODE_BIN}" ]] && command -v find >/dev/null 2>&1; then
+  while IFS= read -r cli; do
+    [[ -z "${cli}" ]] && continue
+    nd="${cli%/lib/node_modules/npm/bin/npm-cli.js}"
+    [[ "${nd}" == "${cli}" ]] && continue
+    for nb in "${nd}/bin/node" "${nd}/bin/nodejs"; do
+      if try_node_cli "${nb}" "${cli}"; then
+        NODE_BIN=${nb}
+        NPM_CLI=${cli}
+        echo "Using npm-cli via node (discovered): ${NODE_BIN} ${NPM_CLI}"
+        export PATH="${NODE_BIN%/*}:${PATH}"
+        break
+      fi
+    done
+  done < <(find /opt/plesk/node -name npm-cli.js -type f 2>/dev/null | head -30)
+fi
+
+# 4) Debian/Ubuntu system layout.
 if [[ -z "${NPM}" && -z "${NODE_BIN}" ]]; then
-  for nb in /usr/bin/node /usr/local/bin/node; do
+  for nb in /usr/bin/node /usr/bin/nodejs /usr/local/bin/node; do
     for cli in \
       /usr/lib/node_modules/npm/bin/npm-cli.js \
       /usr/share/nodejs/npm/bin/npm-cli.js \
       /usr/local/lib/node_modules/npm/bin/npm-cli.js
     do
-      if [[ -f "${nb}" && -f "${cli}" ]] && "${nb}" --version >/dev/null 2>&1; then
+      if try_node_cli "${nb}" "${cli}"; then
         NODE_BIN=${nb}
         NPM_CLI=${cli}
         echo "Using system npm-cli via node: ${NODE_BIN} ${NPM_CLI}"
@@ -65,7 +93,12 @@ run_npm() {
   elif [[ -n "${NODE_BIN}" && -n "${NPM_CLI}" ]]; then
     "${NODE_BIN}" "${NPM_CLI}" "$@"
   else
-    echo "npm not found. id=$(id 2>/dev/null) try on SSH: ls -la /opt/plesk/node/25/bin /opt/plesk/node/25/lib/node_modules/npm/bin" >&2
+    echo "npm not found. id=$(id 2>/dev/null)" >&2
+    echo "--- /opt/plesk/node/*/bin (first dirs) ---" >&2
+    ls -la /opt/plesk/node/25/bin 2>&1 || true
+    ls -la /opt/plesk/node/24/bin 2>&1 || true
+    echo "--- search for npm-cli.js ---" >&2
+    find /opt/plesk/node -name npm-cli.js -type f 2>/dev/null | head -20 >&2 || true
     exit 1
   fi
 }
