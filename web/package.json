@@ -10,7 +10,9 @@
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "import:form-an-sheet": "node scripts/import-form-an-spreadsheet.mjs",
+    "import:form-an-sheet:dry": "node scripts/import-form-an-spreadsheet.mjs --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -32,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "csv-parse": "^6.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "prisma": "^6.6.0",

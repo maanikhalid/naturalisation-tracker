@@ -48,7 +48,8 @@ Reddit often returns **403** (HTML, not JSON) for **hosting / datacenter IPs**. 
 - **`REDDIT_HTTPS_PROXY`** — e.g. `http://user:pass@proxy.example.com:8080`
 - **`HTTPS_PROXY` / `HTTP_PROXY`** — fallback if `REDDIT_HTTPS_PROXY` is unset
 
-Set the variable in the Node.js app environment, restart the app, then use admin **Test fetch only** or `REDDIT_HTTPS_PROXY=... bash scripts/reddit-curl-check.sh 'https://...'`.
+Set the variable in the Node.js app environment, restart the app, then use admin **Test fetch only** or, on SSH, a **real** proxy URL (not the literal characters `...`):  
+`REDDIT_HTTPS_PROXY='http://user:pass@proxy.example.com:8080' bash scripts/reddit-curl-check.sh 'https://www.reddit.com/r/ukvisa/comments/…'`
 
 ### 3) Install dependencies and build — use the simplest option that matches your host
 
