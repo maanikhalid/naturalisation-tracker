@@ -77,6 +77,7 @@ export function AdminDashboard({
       sampleComments?: Array<{ id?: string; preview?: string }>;
     }>;
     limits?: { maxMoreBatches?: number; moreBatchSize?: number; delayMs?: number };
+    redditOutboundProxy?: { enabled?: boolean; envVar?: string | null };
   };
 
   function formatRedditSyncMessage(data: RedditSyncPayload): string {
@@ -90,6 +91,12 @@ export function AdminDashboard({
       lines.push(
         `Limits: ${String(data.limits.maxMoreBatches)} more batches × ${String(data.limits.moreBatchSize)} ids, ${String(data.limits.delayMs)}ms delay (REDDIT_SYNC_* env).`
       );
+    }
+    const px = data.redditOutboundProxy;
+    if (px?.enabled && px.envVar) {
+      lines.push(`Reddit outbound proxy: ON (via ${px.envVar}; URL not shown).`);
+    } else {
+      lines.push(`Reddit outbound proxy: OFF. If the server gets HTTP 403 from Reddit, set REDDIT_HTTPS_PROXY in Plesk env and restart Node.`);
     }
     for (const t of data.threads ?? []) {
       if (t.requestUrl) {

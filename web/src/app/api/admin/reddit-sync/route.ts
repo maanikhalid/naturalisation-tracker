@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { fetchRedditThreadComments } from "@/lib/reddit-thread-fetch";
+import { fetchRedditThreadComments, redditOutboundProxyEnv } from "@/lib/reddit-thread-fetch";
 
 function redditFetchHeaders(): HeadersInit {
   const ua =
@@ -274,13 +274,19 @@ export async function POST(request: Request) {
     }
   }
 
+  const proxySource = redditOutboundProxyEnv();
+
   return NextResponse.json({
     probeOnly,
     imported: probeOnly ? null : imported,
     wouldImport: probeOnly ? imported : null,
     threads,
     limits: { maxMoreBatches, moreBatchSize, delayMs },
+    redditOutboundProxy: {
+      enabled: proxySource !== null,
+      envVar: proxySource,
+    },
     hint:
-      "If wouldImport/imported is 0 but commentsLoaded > 0, see skippedAlreadyInDatabase (already stored) or commentsMatchingTimeline (text format). Test fetch only: POST JSON { probeOnly: true }. From server SSH: curl -sS -o /tmp/r.json -w '%{http_code}' -A \"YourApp/1.0 (contact)\" \"REQUEST_URL\"",
+      "If wouldImport/imported is 0 but commentsLoaded > 0, see skippedAlreadyInDatabase (already stored) or commentsMatchingTimeline (text format). If the server gets HTTP 403 from Reddit, set REDDIT_HTTPS_PROXY (recommended) or HTTPS_PROXY. Test fetch: POST { probeOnly: true }.",
   });
 }
