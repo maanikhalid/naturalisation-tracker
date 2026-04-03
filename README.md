@@ -76,18 +76,21 @@ DATABASE_URL="mysql://db_user:db_password@localhost:3306/db_name"
 
 ### 3) Git deployment actions
 
-In your Plesk Git repository settings, add this in **Additional deployment actions**:
+Plesk’s hook environment is unpredictable (broken `PATH`, missing coreutils). Prefer **npm with `--prefix`** so you never depend on `cd`, `dirname`, or `tee`.
+
+**Option A — one command (replace with your real path to `web`)**
 
 ```bash
-bash scripts/plesk-post-deploy.sh
+PATH=/usr/bin:/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:$PATH CI=1 NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=4096 PLESK_SKIP_TYPESCRIPT=1 npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web ci --include=dev --no-audit --no-fund && PATH=/usr/bin:/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:$PATH CI=1 NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=4096 PLESK_SKIP_TYPESCRIPT=1 npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web run deploy:plesk
 ```
 
-This script will:
+**Option B — repo script (POSIX `/bin/sh` only)**
 
-- install dependencies
-- generate Prisma client
-- apply Prisma schema (`prisma db push`)
-- build Next.js app
+```bash
+/bin/sh scripts/plesk-post-deploy.sh
+```
+
+`npm run deploy:plesk` runs: Prisma generate, `db push`, and `next build` (see `web/package.json`).
 
 ### 4) First deploy checklist
 
