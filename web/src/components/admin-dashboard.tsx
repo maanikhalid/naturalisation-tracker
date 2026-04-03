@@ -54,37 +54,47 @@ export function AdminDashboard({
     if (response.ok) window.location.reload();
   }
 
-  async function syncReddit() {
-    setMessage("Syncing Reddit comments...");
-    const response = await fetch("/api/admin/reddit-sync", { method: "POST" });
-    const data = (await response.json()) as {
+  type RedditSyncPayload = {
+    error?: string;
+    probeOnly?: boolean;
+    imported?: number | null;
+    wouldImport?: number | null;
+    threads?: Array<{
+      ok?: boolean;
+      postUrl?: string;
+      requestUrl?: string;
+      error?: string;
+      httpStatus?: number;
+      contentType?: string;
+      bodySnippet?: string;
+      commentsLoaded?: number;
+      commentsMatchingTimeline?: number;
+      commentsWithParsableDates?: number;
+      skippedAlreadyInDatabase?: number;
       imported?: number;
-      threads?: Array<{
-        ok?: boolean;
-        postUrl?: string;
-        error?: string;
-        httpStatus?: number;
-        contentType?: string;
-        bodySnippet?: string;
-        commentsLoaded?: number;
-        commentsMatchingTimeline?: number;
-        imported?: number;
-        moreBatchesFetched?: number;
-        moreIdsDeferred?: number;
-      }>;
-      limits?: { maxMoreBatches?: number; moreBatchSize?: number; delayMs?: number };
-    };
-    if (!response.ok) {
-      setMessage("Reddit sync failed.");
-      return;
+      moreBatchesFetched?: number;
+      moreIdsDeferred?: number;
+      sampleComments?: Array<{ id?: string; preview?: string }>;
+    }>;
+    limits?: { maxMoreBatches?: number; moreBatchSize?: number; delayMs?: number };
+  };
+
+  function formatRedditSyncMessage(data: RedditSyncPayload): string {
+    const lines: string[] = [];
+    if (data.probeOnly) {
+      lines.push(`Probe only (nothing saved). Would import ${String(data.wouldImport ?? 0)} new rows.`);
+    } else {
+      lines.push(`Imported ${String(data.imported ?? 0)} new entries.`);
     }
-    const lines: string[] = [`Imported ${data.imported ?? 0} new entries.`];
     if (data.limits) {
       lines.push(
-        `Limits: ${data.limits.maxMoreBatches} more batches × ${data.limits.moreBatchSize} ids, ${data.limits.delayMs}ms delay (set REDDIT_SYNC_* env to tune).`
+        `Limits: ${String(data.limits.maxMoreBatches)} more batches × ${String(data.limits.moreBatchSize)} ids, ${String(data.limits.delayMs)}ms delay (REDDIT_SYNC_* env).`
       );
     }
     for (const t of data.threads ?? []) {
+      if (t.requestUrl) {
+        lines.push(`Reddit JSON URL: ${t.requestUrl}`);
+      }
       if (t.ok === false) {
         lines.push(
           `Error: ${t.error ?? "unknown"} (HTTP ${String(t.httpStatus ?? "?")}, ${t.contentType ?? "no content-type"}).`
@@ -94,11 +104,52 @@ export function AdminDashboard({
         }
       } else {
         lines.push(
-          `Loaded ${t.commentsLoaded ?? 0} comments (${t.commentsMatchingTimeline ?? 0} matched timeline text), imported ${t.imported ?? 0}; expanded ${t.moreBatchesFetched ?? 0} “more” batches, ${t.moreIdsDeferred ?? 0} ids left queued.`
+          `Loaded ${String(t.commentsLoaded ?? 0)} comments; ${String(t.commentsMatchingTimeline ?? 0)} matched timeline keywords; ${String(t.commentsWithParsableDates ?? 0)} had parsable app+bio dates; ${String(t.skippedAlreadyInDatabase ?? 0)} already in database; ${data.probeOnly ? "would import" : "imported"} ${String(t.imported ?? 0)} from this thread.`
         );
+        lines.push(
+          `Expanded ${String(t.moreBatchesFetched ?? 0)} "more" batches; ${String(t.moreIdsDeferred ?? 0)} ids still queued (raise REDDIT_SYNC_MAX_MORE_BATCHES if needed).`
+        );
+        const previews = (t.sampleComments ?? [])
+          .map((s) => s.preview?.replace(/\s+/g, " ").slice(0, 100))
+          .filter(Boolean);
+        if (previews.length) {
+          lines.push(`Sample bodies: ${previews.join(" … ")}`);
+        }
       }
     }
-    setMessage(lines.join("\n"));
+    return lines.join("\n");
+  }
+
+  async function syncReddit() {
+    setMessage("Syncing Reddit comments...");
+    const response = await fetch("/api/admin/reddit-sync", { method: "POST" });
+    const data = (await response.json()) as RedditSyncPayload;
+    if (!response.ok) {
+      setMessage(data.error ?? "Reddit sync failed.");
+      return;
+    }
+    setMessage(formatRedditSyncMessage(data));
+  }
+
+  async function probeRedditFetch() {
+    const custom = window.prompt(
+      "Optional: paste a full reddit thread URL to test (or Cancel to use configured active threads only)",
+      ""
+    );
+    setMessage("Probing Reddit fetch (no database writes)…");
+    const body: { probeOnly: boolean; postUrl?: string } = { probeOnly: true };
+    if (custom?.trim()) body.postUrl = custom.trim();
+    const response = await fetch("/api/admin/reddit-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await response.json()) as RedditSyncPayload;
+    if (!response.ok) {
+      setMessage(data.error ?? "Probe failed.");
+      return;
+    }
+    setMessage(formatRedditSyncMessage(data));
   }
 
   async function removeRedditConfig(id: string, label: string) {
@@ -125,8 +176,11 @@ export function AdminDashboard({
           </label>
           <button className="govuk-button govuk-button--secondary">Add thread</button>
         </form>
-        <button className="govuk-button" onClick={syncReddit}>
+        <button type="button" className="govuk-button" onClick={() => void syncReddit()}>
           Run sync now
+        </button>
+        <button type="button" className="govuk-button govuk-button--secondary" onClick={() => void probeRedditFetch()}>
+          Test fetch only (no DB writes)
         </button>
         {message && <p className="govuk-body">{message}</p>}
         <ul className="govuk-list govuk-list--bullet">

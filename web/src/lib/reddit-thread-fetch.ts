@@ -18,6 +18,7 @@ export type FetchedRedditComment = {
 export type RedditThreadFetchResult =
   | {
       ok: true;
+      requestUrl: string;
       httpStatus: number;
       contentType: string;
       linkId: string;
@@ -28,6 +29,7 @@ export type RedditThreadFetchResult =
     }
   | {
       ok: false;
+      requestUrl: string;
       httpStatus: number;
       contentType: string;
       error: string;
@@ -103,7 +105,8 @@ function linkIdFromPayload(payload: unknown): string | null {
   return typeof name === "string" && name.startsWith("t3_") ? name : null;
 }
 
-function buildRedditThreadJsonUrl(postUrl: string): string {
+/** Same `.json` URL the sync uses (for curl checks and probes). */
+export function redditThreadJsonUrl(postUrl: string): string {
   const trimmed = postUrl.trim().replace(/\/$/, "");
   const withJson = trimmed.endsWith(".json") ? trimmed : `${trimmed}.json`;
   const url = new URL(withJson);
@@ -154,7 +157,7 @@ export async function fetchRedditThreadComments(
   const moreBatchSize = options?.moreBatchSize ?? 40;
   const delayMs = options?.delayMs ?? 120;
 
-  const jsonUrl = buildRedditThreadJsonUrl(postUrl);
+  const jsonUrl = redditThreadJsonUrl(postUrl);
   const response = await fetch(jsonUrl, { headers, cache: "no-store" });
   const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
@@ -162,6 +165,7 @@ export async function fetchRedditThreadComments(
   if (!response.ok) {
     return {
       ok: false,
+      requestUrl: jsonUrl,
       httpStatus: response.status,
       contentType,
       error: `HTTP ${response.status} from Reddit`,
@@ -175,6 +179,7 @@ export async function fetchRedditThreadComments(
   } catch (e) {
     return {
       ok: false,
+      requestUrl: jsonUrl,
       httpStatus: response.status,
       contentType,
       error: e instanceof Error ? e.message : "Invalid JSON from Reddit",
@@ -186,6 +191,7 @@ export async function fetchRedditThreadComments(
   if (!linkId) {
     return {
       ok: false,
+      requestUrl: jsonUrl,
       httpStatus: response.status,
       contentType,
       error: "Could not read submission id (t3_) from Reddit payload.",
@@ -220,6 +226,7 @@ export async function fetchRedditThreadComments(
 
   return {
     ok: true,
+    requestUrl: jsonUrl,
     httpStatus: response.status,
     contentType,
     linkId,

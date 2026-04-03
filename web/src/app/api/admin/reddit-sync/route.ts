@@ -56,11 +56,56 @@ function inferApplicationMethod(bodyLower: string, lines: string[]): "POST" | "O
   return "ONLINE";
 }
 
-export async function POST() {
+type SyncBody = { probeOnly?: boolean; postUrl?: string };
+
+export async function POST(request: Request) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const configs = await prisma.redditTrackingConfig.findMany({ where: { active: true } });
+  let probeOnly = false;
+  let explicitPostUrl: string | undefined;
+  try {
+    const ct = request.headers.get("content-type") ?? "";
+    if (ct.includes("application/json")) {
+      const body = (await request.json()) as SyncBody;
+      probeOnly = Boolean(body?.probeOnly);
+      if (typeof body?.postUrl === "string" && body.postUrl.trim().length > 0) {
+        explicitPostUrl = body.postUrl.trim();
+      }
+    }
+  } catch {
+    // empty or invalid JSON body is fine for legacy clients
+  }
+
+  if (explicitPostUrl && !explicitPostUrl.includes("reddit.com")) {
+    return NextResponse.json(
+      { error: "postUrl must be a reddit.com thread URL when provided." },
+      { status: 400 }
+    );
+  }
+
+  if (explicitPostUrl && !probeOnly) {
+    return NextResponse.json(
+      { error: "postUrl is only allowed together with probeOnly: true." },
+      { status: 400 }
+    );
+  }
+
+  const dbConfigs = await prisma.redditTrackingConfig.findMany({ where: { active: true } });
+  const configs = explicitPostUrl
+    ? [{ id: "__probe__", postUrl: explicitPostUrl }]
+    : dbConfigs.map((c) => ({ id: c.id, postUrl: c.postUrl }));
+
+  if (configs.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "No active Reddit threads. Add one in admin, or POST { probeOnly: true, postUrl: \"https://www.reddit.com/...\" } to test a URL.",
+      },
+      { status: 400 }
+    );
+  }
+
   let imported = 0;
 
   const maxMoreBatches = (() => {
@@ -100,6 +145,7 @@ export async function POST() {
         threads.push({
           postUrl: config.postUrl,
           ok: false,
+          requestUrl: result.requestUrl,
           error: result.error,
           httpStatus: result.httpStatus,
           contentType: result.contentType,
@@ -109,8 +155,16 @@ export async function POST() {
         continue;
       }
 
+      const sampleComments = result.comments.slice(0, 3).map((c) => ({
+        id: c.id,
+        permalink: c.permalink,
+        preview: c.body.replace(/\s+/g, " ").slice(0, 220),
+      }));
+
       let threadImported = 0;
       let matchedTimeline = 0;
+      let skippedDuplicate = 0;
+      let parseReady = 0;
 
       for (const comment of result.comments) {
         const body = comment.body;
@@ -140,6 +194,8 @@ export async function POST() {
         const biometricDate = extractDate(biometricLine);
         if (!applicationDate || !biometricDate) continue;
 
+        parseReady += 1;
+
         const approvalLine = lineWithMilestoneDate(lines, [
           /approval\s*date/,
           /approved\s*on/,
@@ -151,10 +207,20 @@ export async function POST() {
         const permalink = comment.permalink;
         if (!permalink) continue;
         const sourceReference = `https://reddit.com${permalink}`;
+
         const existing = await prisma.timelineEntry.findFirst({
           where: { sourceType: "REDDIT", sourceReference },
         });
-        if (existing) continue;
+        if (existing) {
+          skippedDuplicate += 1;
+          continue;
+        }
+
+        if (probeOnly) {
+          threadImported += 1;
+          imported += 1;
+          continue;
+        }
 
         await prisma.timelineEntry.create({
           data: {
@@ -173,23 +239,30 @@ export async function POST() {
         imported += 1;
       }
 
-      await prisma.redditTrackingConfig.update({
-        where: { id: config.id },
-        data: { lastSyncedAt: new Date() },
-      });
+      if (!probeOnly && config.id !== "__probe__") {
+        await prisma.redditTrackingConfig.update({
+          where: { id: config.id },
+          data: { lastSyncedAt: new Date() },
+        });
+      }
 
       threads.push({
         postUrl: config.postUrl,
         ok: true,
+        probeOnly,
+        requestUrl: result.requestUrl,
         httpStatus: result.httpStatus,
         contentType: result.contentType,
         linkId: result.linkId,
         topLevelChildCount: result.topLevelChildCount,
         commentsLoaded: result.comments.length,
         commentsMatchingTimeline: matchedTimeline,
+        commentsWithParsableDates: parseReady,
+        skippedAlreadyInDatabase: skippedDuplicate,
         imported: threadImported,
         moreBatchesFetched: result.moreBatchesFetched,
         moreIdsDeferred: result.moreIdsDeferred,
+        sampleComments,
       });
     } catch (err) {
       console.error("Reddit sync thread failed", config.postUrl, err);
@@ -202,8 +275,12 @@ export async function POST() {
   }
 
   return NextResponse.json({
-    imported,
+    probeOnly,
+    imported: probeOnly ? null : imported,
+    wouldImport: probeOnly ? imported : null,
     threads,
     limits: { maxMoreBatches, moreBatchSize, delayMs },
+    hint:
+      "If wouldImport/imported is 0 but commentsLoaded > 0, see skippedAlreadyInDatabase (already stored) or commentsMatchingTimeline (text format). Test fetch only: POST JSON { probeOnly: true }. From server SSH: curl -sS -o /tmp/r.json -w '%{http_code}' -A \"YourApp/1.0 (contact)\" \"REQUEST_URL\"",
   });
 }
