@@ -103,7 +103,7 @@ tar -xJf node-v22.14.0-linux-x64.tar.xz -C tools
 mv tools/node-v22.14.0-linux-x64 tools/node
 ```
 
-Use the version you need; the layout must be **`tools/node/bin/npm`** (and `node`). Do not commit `tools/node/` (it is ignored). Push the rest of the repo; after Git deploy, **`bash scripts/plesk-post-deploy.sh`** will pick up the vendored npm first.
+Use the version you need; the layout must include **`tools/node/bin/node`** and **`tools/node/lib/node_modules/npm/bin/npm-cli.js`**. The deploy script runs **`node …/npm-cli.js`** (not `bin/npm`), because **`bin/npm` is a script with `#!/usr/bin/env node`**, which fails in a Plesk chroot where **`/usr/bin/env`** does not exist. Do not commit `tools/node/` (it is ignored).
 
 #### Command
 

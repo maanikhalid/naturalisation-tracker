@@ -63,8 +63,9 @@ if [[ -n "${NODE_BIN}" && -n "${NPM_CLI}" ]]; then
   fi
 fi
 
-# PATH: chroot-safe first (vendored Node, $HOME, repo parent nvm), then typical host paths.
-export PATH="${REPO_ROOT}/tools/node/bin:${PATH}"
+# PATH: do NOT prepend ${REPO_ROOT}/tools/node/bin here — bin/npm uses #!/usr/bin/env node and
+# breaks in Plesk chroot (no /usr/bin/env). We invoke tools/node via node + npm-cli.js only.
+# PATH: chroot-safe first ($HOME, repo parent nvm), then typical host paths.
 if [[ -n "${HOME:-}" ]]; then
   export PATH="${HOME}/.local/bin:${HOME}/bin:${PATH}"
   if [[ -d "${HOME}/.nvm/versions/node" ]]; then
@@ -85,18 +86,14 @@ if [[ -n "${_repo_parent}" && "${_repo_parent}" != "${REPO_ROOT}" && -d "${_repo
 fi
 export PATH="/usr/bin:/bin:/usr/sbin:/usr/local/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:/opt/plesk/node/22/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:${PATH}"
 
-# 0a) Node vendored inside repo (works in chroot) — see README "Vendoring Node for chroot"
+# 0a) Vendored Node — always node + npm-cli.js (never bin/npm: its shebang is #!/usr/bin/env node).
 if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
-  _tnpm="${REPO_ROOT}/tools/node/bin/npm"
   _tnode="${REPO_ROOT}/tools/node/bin/node"
   _tcli="${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"
-  if [[ -f "${_tnpm}" ]] && "${_tnpm}" --version >/dev/null 2>&1; then
-    NPM=${_tnpm}
-    echo "Using vendored npm: ${NPM}"
-  elif try_node_cli "${_tnode}" "${_tcli}"; then
+  if try_node_cli "${_tnode}" "${_tcli}"; then
     NODE_BIN=${_tnode}
     NPM_CLI=${_tcli}
-    echo "Using vendored node + npm-cli: ${NODE_BIN} ${NPM_CLI}"
+    echo "Using vendored node + npm-cli (chroot-safe): ${NODE_BIN}"
     export PATH="${NODE_BIN%/*}:${PATH}"
   fi
 fi
@@ -136,6 +133,17 @@ if [[ -z "${NPM}" ]]; then
 fi
 if [[ -z "${NPM}" ]]; then
   NPM=$(command -v npm 2>/dev/null || true)
+fi
+
+# Never use vendored bin/npm as NPM — same #!/usr/bin/env issue in chroot if PATH still finds it.
+if [[ -n "${NPM}" && "${NPM}" == "${REPO_ROOT}/tools/node/bin/npm" ]]; then
+  NPM=""
+  if [[ (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && try_node_cli "${REPO_ROOT}/tools/node/bin/node" "${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"; then
+    NODE_BIN="${REPO_ROOT}/tools/node/bin/node"
+    NPM_CLI="${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"
+    export PATH="${NODE_BIN%/*}:${PATH}"
+    echo "Switched vendored npm wrapper to node + npm-cli (chroot-safe)"
+  fi
 fi
 
 # 2) Fixed paths under /opt/plesk/node/*
