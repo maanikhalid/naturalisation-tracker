@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# Plesk may invoke this with `sh`, not bash — no pipefail, no bash-only options.
+set -e
 
 # Plesk Git "Additional deployment actions" script.
 # Runs from repository root.
