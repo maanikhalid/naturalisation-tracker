@@ -86,16 +86,27 @@ if [[ -n "${_repo_parent}" && "${_repo_parent}" != "${REPO_ROOT}" && -d "${_repo
 fi
 export PATH="/usr/bin:/bin:/usr/sbin:/usr/local/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:/opt/plesk/node/22/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:${PATH}"
 
-# 0a) Vendored Node — always node + npm-cli.js (never bin/npm: its shebang is #!/usr/bin/env node).
+# 0a) Vendored Node — always node + npm-cli.js (never bin/npm: #!/usr/bin/env breaks in chroot).
+# Try several bases: repo tools/ (often WIPED by Git deploy if untracked), sibling .local-node-tools, $HOME.
 if [[ -z "${NPM}" && (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]]; then
-  _tnode="${REPO_ROOT}/tools/node/bin/node"
-  _tcli="${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"
-  if try_node_cli "${_tnode}" "${_tcli}"; then
-    NODE_BIN=${_tnode}
-    NPM_CLI=${_tcli}
-    echo "Using vendored node + npm-cli (chroot-safe): ${NODE_BIN}"
-    export PATH="${NODE_BIN%/*}:${PATH}"
-  fi
+  _vendor_bases=(
+    "${NODE_VENDOR_ROOT:-}"
+    "${REPO_ROOT}/tools/node"
+    "${REPO_ROOT%/*}/.local-node-tools/node"
+    "${HOME}/.local-node-tools/node"
+  )
+  for _base in "${_vendor_bases[@]}"; do
+    [[ -z "${_base}" ]] && continue
+    _tnode="${_base}/bin/node"
+    _tcli="${_base}/lib/node_modules/npm/bin/npm-cli.js"
+    if try_node_cli "${_tnode}" "${_tcli}"; then
+      NODE_BIN=${_tnode}
+      NPM_CLI=${_tcli}
+      echo "Using vendored node + npm-cli (chroot-safe): ${NODE_BIN}"
+      export PATH="${NODE_BIN%/*}:${PATH}"
+      break
+    fi
+  done
 fi
 
 # 0) After PATH includes $HOME, npm may resolve (nvm, etc.)
@@ -135,14 +146,15 @@ if [[ -z "${NPM}" ]]; then
   NPM=$(command -v npm 2>/dev/null || true)
 fi
 
-# Never use vendored bin/npm as NPM — same #!/usr/bin/env issue in chroot if PATH still finds it.
-if [[ -n "${NPM}" && "${NPM}" == "${REPO_ROOT}/tools/node/bin/npm" ]]; then
-  NPM=""
-  if [[ (-z "${NODE_BIN}" || -z "${NPM_CLI}") ]] && try_node_cli "${REPO_ROOT}/tools/node/bin/node" "${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"; then
-    NODE_BIN="${REPO_ROOT}/tools/node/bin/node"
-    NPM_CLI="${REPO_ROOT}/tools/node/lib/node_modules/npm/bin/npm-cli.js"
+# Never run bin/npm as NPM if it is the stock wrapper (#!/usr/bin/env) — use node + npm-cli.js for that prefix.
+if [[ -n "${NPM}" && "${NPM}" == */bin/npm && -f "${NPM%/bin/npm}/lib/node_modules/npm/bin/npm-cli.js" ]]; then
+  _vb="${NPM%/bin/npm}"
+  if try_node_cli "${_vb}/bin/node" "${_vb}/lib/node_modules/npm/bin/npm-cli.js"; then
+    NPM=""
+    NODE_BIN="${_vb}/bin/node"
+    NPM_CLI="${_vb}/lib/node_modules/npm/bin/npm-cli.js"
     export PATH="${NODE_BIN%/*}:${PATH}"
-    echo "Switched vendored npm wrapper to node + npm-cli (chroot-safe)"
+    echo "Switched npm wrapper to node + npm-cli (chroot-safe): ${NODE_BIN}"
   fi
 fi
 
@@ -226,7 +238,15 @@ run_npm() {
     "${LS_CMD}" -la "${HOME:-.}" 2>&1 || true
     "${LS_CMD}" -la /opt 2>&1 || true
     "${LS_CMD}" -la /usr/bin/npm 2>&1 || true
-    echo "--- hint: vendor Node into ${REPO_ROOT}/tools/node (see README), or nvm install under ${HOME}, or ${REPO_ROOT}/.plesk-node-env.sh ---" >&2
+    echo "--- REPO_ROOT=${REPO_ROOT} (vendored Node lookup) ---" >&2
+    "${LS_CMD}" -la "${REPO_ROOT}/tools/node/bin" 2>&1 || echo "(no ${REPO_ROOT}/tools/node — Git deploy often deletes untracked tools/node)" >&2
+    "${LS_CMD}" -la "${REPO_ROOT%/*}/.local-node-tools/node/bin" 2>&1 || true
+    "${LS_CMD}" -la "${HOME}/.local-node-tools/node/bin" 2>&1 || true
+    if [[ -f "${REPO_ROOT}/tools/node/bin/node" ]]; then
+      echo "--- trying: ${REPO_ROOT}/tools/node/bin/node --version ---" >&2
+      "${REPO_ROOT}/tools/node/bin/node" --version 2>&1 || true
+    fi
+    echo "--- hint: put Node outside the repo (see README), set NODE_VENDOR_ROOT, or ${REPO_ROOT}/.plesk-node-env.sh ---" >&2
     exit 1
   fi
 }

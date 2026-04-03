@@ -103,7 +103,18 @@ tar -xJf node-v22.14.0-linux-x64.tar.xz -C tools
 mv tools/node-v22.14.0-linux-x64 tools/node
 ```
 
-Use the version you need; the layout must include **`tools/node/bin/node`** and **`tools/node/lib/node_modules/npm/bin/npm-cli.js`**. The deploy script runs **`node …/npm-cli.js`** (not `bin/npm`), because **`bin/npm` is a script with `#!/usr/bin/env node`**, which fails in a Plesk chroot where **`/usr/bin/env`** does not exist. Do not commit `tools/node/` (it is ignored).
+Use the version you need; the layout must include **`bin/node`** and **`lib/node_modules/npm/bin/npm-cli.js`** under the same directory. The deploy script runs **`node …/npm-cli.js`** (not `bin/npm`), because **`bin/npm` uses `#!/usr/bin/env node`**, which fails in a Plesk chroot where **`/usr/bin/env`** does not exist. Do not commit `tools/node/` (it is ignored).
+
+**Git deploy usually deletes untracked directories** such as `tools/node/`. To keep Node across deploys, unpack once **outside** the clone, next to the repo (still inside the chroot), for example:
+
+```bash
+# From /httpdocs (chroot path) or the matching host path under /var/www/vhosts/.../httpdocs
+mkdir -p .local-node-tools
+tar -xJf node-v22.14.0-linux-x64.tar.xz -C .local-node-tools
+mv .local-node-tools/node-v22.14.0-linux-x64 .local-node-tools/node
+```
+
+Then you have **`/httpdocs/.local-node-tools/node/bin/node`** (chroot path). The deploy script looks for that layout automatically. Alternatively set **`NODE_VENDOR_ROOT`** (e.g. in **`.plesk-node-env.sh`**) to that directory.
 
 #### Command
 
