@@ -1,8 +1,8 @@
-import { redirect } from "next/navigation";
-import { clearAdminCookie, getAdminSession } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { AdminLogin } from "@/components/admin-login";
+import { logoutAdmin } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +17,43 @@ export default async function AdminPage() {
     );
   }
 
-  const [entries, configs] = await Promise.all([
-    prisma.timelineEntry.findMany({
-      where: { isRemoved: false },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.redditTrackingConfig.findMany({ orderBy: { createdAt: "desc" } }),
-  ]);
+  let entries;
+  let configs;
+  try {
+    [entries, configs] = await Promise.all([
+      prisma.timelineEntry.findMany({
+        where: { isRemoved: false },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
+      prisma.redditTrackingConfig.findMany({ orderBy: { createdAt: "desc" } }),
+    ]);
+  } catch (err) {
+    console.error("Admin dashboard: database query failed", err);
+    return (
+      <main className="govuk-width-container app-main">
+        <div className="admin-header">
+          <h1 className="govuk-heading-l">Admin dashboard</h1>
+          <form action={logoutAdmin}>
+            <button type="submit" className="govuk-button govuk-button--secondary">
+              Logout
+            </button>
+          </form>
+        </div>
+        <div className="govuk-error-summary" role="alert">
+          <h2 className="govuk-error-summary__title">Could not load dashboard data</h2>
+          <div className="govuk-error-summary__body">
+            <p className="govuk-body">
+              The app could not reach the database or the schema may be out of date. On the server,
+              confirm <code className="govuk-body-s">DATABASE_URL</code> is correct, then run{" "}
+              <code className="govuk-body-s">npx prisma db push</code> or your migration command.
+              Check the application logs for the underlying error.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const serializedEntries = entries.map(
     (entry: {
@@ -64,14 +93,10 @@ export default async function AdminPage() {
     <main className="govuk-width-container app-main">
       <div className="admin-header">
         <h1 className="govuk-heading-l">Admin dashboard</h1>
-        <form
-          action={async () => {
-            "use server";
-            await clearAdminCookie();
-            redirect("/admin");
-          }}
-        >
-          <button className="govuk-button govuk-button--secondary">Logout</button>
+        <form action={logoutAdmin}>
+          <button type="submit" className="govuk-button govuk-button--secondary">
+            Logout
+          </button>
         </form>
       </div>
       <AdminDashboard entries={serializedEntries} configs={serializedConfigs} />

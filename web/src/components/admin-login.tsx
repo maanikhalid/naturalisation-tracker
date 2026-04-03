@@ -25,8 +25,17 @@ export function AdminLogin() {
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      const data = await response.json();
-      setError(data.error ?? "Login failed");
+      let message = "Login failed";
+      try {
+        const data = (await response.json()) as { error?: string };
+        message = data.error ?? message;
+      } catch {
+        if (response.status >= 500) {
+          message =
+            "Server error (response was not JSON). Check the app is running, DATABASE_URL, and ADMIN_JWT_SECRET.";
+        }
+      }
+      setError(message);
       setIsLoading(false);
       return;
     }
