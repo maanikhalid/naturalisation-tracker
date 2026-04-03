@@ -76,21 +76,23 @@ DATABASE_URL="mysql://db_user:db_password@localhost:3306/db_name"
 
 ### 3) Git deployment actions
 
-Plesk’s hook environment is unpredictable (broken `PATH`, missing coreutils). Prefer **npm with `--prefix`** so you never depend on `cd`, `dirname`, or `tee`.
+Plesk may invoke hooks with `sh`, which breaks bash-only options and differs from your SSH session. **Call bash explicitly** and run from the **repository root**.
 
-**Option A — one command (replace with your real path to `web`)**
-
-```bash
-PATH=/usr/bin:/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:$PATH CI=1 NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=4096 PLESK_SKIP_TYPESCRIPT=1 npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web ci --include=dev --no-audit --no-fund && PATH=/usr/bin:/bin:/opt/plesk/node/20/bin:/opt/plesk/node/18/bin:$PATH CI=1 NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=4096 PLESK_SKIP_TYPESCRIPT=1 npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web run deploy:plesk
-```
-
-**Option B — repo script (POSIX `/bin/sh` only)**
+**Recommended — repo script**
 
 ```bash
-/bin/sh scripts/plesk-post-deploy.sh
+bash scripts/plesk-post-deploy.sh
 ```
 
-`npm run deploy:plesk` runs: Prisma generate, `db push`, and `next build` (see `web/package.json`).
+The script exports a sane `PATH` (including `/usr/bin` and common `/opt/plesk/node/*/bin` locations), then runs `npm ci`, Prisma generate/push, and `npm run build` under `web/`.
+
+**If `npm` is still not found in the hook**, use absolute `npm` / `npm --prefix` (replace paths with yours):
+
+```bash
+PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web ci --include=dev --no-audit --no-fund && PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web run build
+```
+
+Optional: `npm run deploy:plesk` in `web/package.json` chains Prisma generate, `db push`, and `next build` in one script if you prefer that over the shell steps.
 
 ### 4) First deploy checklist
 
