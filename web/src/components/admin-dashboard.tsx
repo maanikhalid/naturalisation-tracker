@@ -57,8 +57,48 @@ export function AdminDashboard({
   async function syncReddit() {
     setMessage("Syncing Reddit comments...");
     const response = await fetch("/api/admin/reddit-sync", { method: "POST" });
-    const data = await response.json();
-    setMessage(response.ok ? `Imported ${data.imported} entries.` : "Reddit sync failed.");
+    const data = (await response.json()) as {
+      imported?: number;
+      threads?: Array<{
+        ok?: boolean;
+        postUrl?: string;
+        error?: string;
+        httpStatus?: number;
+        contentType?: string;
+        bodySnippet?: string;
+        commentsLoaded?: number;
+        commentsMatchingTimeline?: number;
+        imported?: number;
+        moreBatchesFetched?: number;
+        moreIdsDeferred?: number;
+      }>;
+      limits?: { maxMoreBatches?: number; moreBatchSize?: number; delayMs?: number };
+    };
+    if (!response.ok) {
+      setMessage("Reddit sync failed.");
+      return;
+    }
+    const lines: string[] = [`Imported ${data.imported ?? 0} new entries.`];
+    if (data.limits) {
+      lines.push(
+        `Limits: ${data.limits.maxMoreBatches} more batches × ${data.limits.moreBatchSize} ids, ${data.limits.delayMs}ms delay (set REDDIT_SYNC_* env to tune).`
+      );
+    }
+    for (const t of data.threads ?? []) {
+      if (t.ok === false) {
+        lines.push(
+          `Error: ${t.error ?? "unknown"} (HTTP ${String(t.httpStatus ?? "?")}, ${t.contentType ?? "no content-type"}).`
+        );
+        if (t.bodySnippet) {
+          lines.push(`Snippet: ${t.bodySnippet.replace(/\s+/g, " ").slice(0, 160)}`);
+        }
+      } else {
+        lines.push(
+          `Loaded ${t.commentsLoaded ?? 0} comments (${t.commentsMatchingTimeline ?? 0} matched timeline text), imported ${t.imported ?? 0}; expanded ${t.moreBatchesFetched ?? 0} “more” batches, ${t.moreIdsDeferred ?? 0} ids left queued.`
+        );
+      }
+    }
+    setMessage(lines.join("\n"));
   }
 
   async function removeRedditConfig(id: string, label: string) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { fetchRedditThreadComments } from "@/lib/reddit-thread-fetch";
 
 function redditFetchHeaders(): HeadersInit {
   const ua =
@@ -25,7 +26,6 @@ function extractDate(raw: string): Date | null {
   return Number.isNaN(d.valueOf()) ? null : d;
 }
 
-/** Normalise markdown bullets / bold so regex matches "**Application date:**" etc. */
 function normaliseTimelineLine(line: string): string {
   return line
     .replace(/\*+/g, " ")
@@ -35,17 +35,9 @@ function normaliseTimelineLine(line: string): string {
     .toLowerCase();
 }
 
-/**
- * Pick the line that actually carries the milestone date. Using the first line that merely
- * contains "application" matches headings like "Application timeline" and yields no date.
- */
-function lineWithMilestoneDate(
-  lines: string[],
-  patterns: RegExp[]
-): string | null {
+function lineWithMilestoneDate(lines: string[], patterns: RegExp[]): string | null {
   const normalised = lines.map((l) => normaliseTimelineLine(l));
-  for (let i = 0; i < normalised.length; i += 1) {
-    const line = normalised[i];
+  for (const line of normalised) {
     if (!line) continue;
     if (!patterns.some((re) => re.test(line))) continue;
     if (extractDate(line)) return line;
@@ -71,26 +63,58 @@ export async function POST() {
   const configs = await prisma.redditTrackingConfig.findMany({ where: { active: true } });
   let imported = 0;
 
+  const maxMoreBatches = (() => {
+    const raw = process.env.REDDIT_SYNC_MAX_MORE_BATCHES;
+    if (raw === undefined || raw === "") return 80;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n)) return 80;
+    return Math.min(500, Math.max(0, n));
+  })();
+  const moreBatchSize = (() => {
+    const raw = process.env.REDDIT_SYNC_MORE_BATCH_SIZE;
+    if (raw === undefined || raw === "") return 40;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n)) return 40;
+    return Math.min(100, Math.max(1, n));
+  })();
+  const delayMs = (() => {
+    const raw = process.env.REDDIT_SYNC_DELAY_MS;
+    if (raw === undefined || raw === "") return 120;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n)) return 120;
+    return Math.min(5000, Math.max(0, n));
+  })();
+
+  const threads: Array<Record<string, unknown>> = [];
+
   for (const config of configs) {
     try {
-      const url = config.postUrl.endsWith(".json")
-        ? config.postUrl
-        : `${config.postUrl.replace(/\/$/, "")}.json`;
-
-      const response = await fetch(url, {
-        headers: redditFetchHeaders(),
-        cache: "no-store",
+      const headers = redditFetchHeaders();
+      const result = await fetchRedditThreadComments(config.postUrl, headers, {
+        maxMoreBatches,
+        moreBatchSize,
+        delayMs,
       });
-      if (!response.ok) continue;
 
-      const payload = await response.json();
-      const comments = payload?.[1]?.data?.children ?? [];
+      if (!result.ok) {
+        threads.push({
+          postUrl: config.postUrl,
+          ok: false,
+          error: result.error,
+          httpStatus: result.httpStatus,
+          contentType: result.contentType,
+          bodySnippet: result.bodySnippet,
+        });
+        console.error("Reddit thread fetch failed", config.postUrl, result.error, result.bodySnippet);
+        continue;
+      }
 
-      for (const comment of comments) {
-        if (comment?.kind === "more") continue;
+      let threadImported = 0;
+      let matchedTimeline = 0;
 
-        const body = String(comment?.data?.body ?? "");
-        if (!body) continue;
+      for (const comment of result.comments) {
+        const body = comment.body;
+        if (!body || body === "[deleted]" || body === "[removed]") continue;
 
         const lines = body.split("\n");
         const bodyLower = body.toLowerCase();
@@ -110,6 +134,8 @@ export async function POST() {
         ]);
         if (!applicationLine || !biometricLine) continue;
 
+        matchedTimeline += 1;
+
         const applicationDate = extractDate(applicationLine);
         const biometricDate = extractDate(biometricLine);
         if (!applicationDate || !biometricDate) continue;
@@ -122,7 +148,7 @@ export async function POST() {
         ]);
         const approvalDate = approvalLine ? extractDate(approvalLine) : null;
 
-        const permalink = String(comment?.data?.permalink ?? "");
+        const permalink = comment.permalink;
         if (!permalink) continue;
         const sourceReference = `https://reddit.com${permalink}`;
         const existing = await prisma.timelineEntry.findFirst({
@@ -143,6 +169,7 @@ export async function POST() {
             isVerified: false,
           },
         });
+        threadImported += 1;
         imported += 1;
       }
 
@@ -150,10 +177,33 @@ export async function POST() {
         where: { id: config.id },
         data: { lastSyncedAt: new Date() },
       });
+
+      threads.push({
+        postUrl: config.postUrl,
+        ok: true,
+        httpStatus: result.httpStatus,
+        contentType: result.contentType,
+        linkId: result.linkId,
+        topLevelChildCount: result.topLevelChildCount,
+        commentsLoaded: result.comments.length,
+        commentsMatchingTimeline: matchedTimeline,
+        imported: threadImported,
+        moreBatchesFetched: result.moreBatchesFetched,
+        moreIdsDeferred: result.moreIdsDeferred,
+      });
     } catch (err) {
       console.error("Reddit sync thread failed", config.postUrl, err);
+      threads.push({
+        postUrl: config.postUrl,
+        ok: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
     }
   }
 
-  return NextResponse.json({ imported });
+  return NextResponse.json({
+    imported,
+    threads,
+    limits: { maxMoreBatches, moreBatchSize, delayMs },
+  });
 }
