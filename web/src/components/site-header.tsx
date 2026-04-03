@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/submit", label: "Submit" },
   { href: "/data", label: "Data explorer" },
   { href: "/about", label: "About" },
+  { href: "/contributors", label: "Contributors" },
   { href: "/admin", label: "Admin" },
 ] as const;
 
