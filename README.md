@@ -74,75 +74,48 @@ Example:
 DATABASE_URL="mysql://db_user:db_password@localhost:3306/db_name"
 ```
 
-### 3) Git deployment actions
+### 3) Install dependencies and build — use the simplest option that matches your host
 
-#### Plesk chroot (SSH disabled for the system user)
+Plesk + Git hooks are a common source of pain: **Additional deployment actions** may run in a **chroot** with no `/usr/bin/env`, no `/opt/plesk` in `PATH`, and **`HOME=/`**, while SSH as root works fine. Official and community guidance is to **avoid fighting that in a giant shell script** and use one of these instead.
 
-If **SSH is disabled** (or restricted) for the subscription’s system user, Plesk may run Git **Additional deployment actions** inside a **chroot** whose root is that user’s home. In that environment:
+#### Option A — Plesk Node.js UI (simplest, no Git hook)
 
-- Paths like `/usr/bin`, `/opt/plesk`, and **Plesk’s Node** are often **outside the jail** and **cannot be executed**.
-- Only files under the subscription (e.g. `httpdocs`, home dotfiles) are reliably available.
+Use the **Node.js** screen for the domain (see [Plesk: hosting Node.js applications](https://docs.plesk.com/en-US/obsidian/administrator-guide/website-management/hosting-nodejs-applications.76652/)):
 
-So the same script that works in an interactive SSH session as root can fail in the hook with **“npm not found”** even though Node exists on the server.
+1. **Application root** = `httpdocs/web` (this project).
+2. Use **NPM install** (or equivalent) from the panel so Plesk runs `npm` with the correct Node version.
+3. Add a **package.json script** or **Run script** step to run **`build`** after install if the panel supports it, or run **`npx prisma generate`**, **`npx prisma db push`**, and **`npm run build`** from **SSH** once after each deploy (see Option B).
 
-**Practical options:**
+Leave **Git “Additional deployment actions” empty** if you use this path.
 
-1. **Allow SSH without chroot** for that subscription (Plesk / host policy), so hooks see the real filesystem; or run deploy commands over full SSH instead of the Git hook.
-2. **Vendor Node inside the repo** (recommended when you cannot change Plesk policy): extract the official **Linux x64** Node binary tarball into **`naturalisation-tracker/tools/node/`** so it contains `tools/node/bin/node` and `tools/node/bin/npm` (see **Vendoring Node** below). That path is inside the chroot. The directory `tools/node/` is gitignored.
-3. Install **nvm** under the real home directory. Plesk often sets **`HOME=/`** in the hook, which breaks `~/.nvm`. The deploy script sets **`HOME` to the parent of the repo** (e.g. `/httpdocs`) when `HOME` is `/`, so nvm under **`/httpdocs/.nvm`** is discovered if you install it there (SSH once as the subscription user, or copy files in).
-4. Put a **`.plesk-node-env.sh`** in the repo root on the server (gitignored) with `NPM=...` or `NODE_BIN=` + `NPM_CLI=` pointing to binaries **inside** the subscription.
-5. **Build elsewhere** (CI) and deploy artifacts, and keep the hook minimal (no `npm` on server).
+#### Option B — Git deploy + SSH that is not chrooted (recommended if you want a hook)
 
-#### Vendoring Node for chroot
+1. In **Hosting / SSH access**, enable SSH with **`/bin/bash`** and **not** chrooted (same pattern as [common Next.js on Plesk write-ups](https://www.hennio.dev/github-cicd-nextjs-on-plesk/)).
+2. In Git, **Additional deployment actions** (repository root):
 
-On a machine with Node (or download in a browser), get the **Linux 64-bit** binary from [Node.js downloads](https://nodejs.org/en/download/) (e.g. `linux-x64` **tar.xz**). On the server (or before commit, locally), from the **repository root** (`naturalisation-tracker/`):
+   ```bash
+   bash scripts/plesk-post-deploy.sh
+   ```
 
-```bash
-mkdir -p tools
-tar -xJf node-v22.14.0-linux-x64.tar.xz -C tools
-mv tools/node-v22.14.0-linux-x64 tools/node
-```
+3. Optional: on the server only, create **`naturalisation-tracker/.plesk-deploy-env.sh`** (gitignored) to extend `PATH` or set env vars, for example:
 
-Use the version you need; the layout must include **`bin/node`** and **`lib/node_modules/npm/bin/npm-cli.js`** under the same directory. The deploy script runs **`node …/npm-cli.js`** (not `bin/npm`), because **`bin/npm` uses `#!/usr/bin/env node`**, which fails in a Plesk chroot where **`/usr/bin/env`** does not exist. Do not commit `tools/node/` (it is ignored).
+   ```bash
+   export PATH="/opt/plesk/node/22/bin:/usr/bin:/bin:$PATH"
+   ```
 
-**Git deploy usually deletes untracked directories** such as `tools/node/`. To keep Node across deploys, unpack once **outside** the clone, next to the repo (still inside the chroot), for example:
+The script is intentionally short: `npm ci`, Prisma generate/push, `npm run build` under `web/`.
 
-```bash
-# From /httpdocs (chroot path) or the matching host path under /var/www/vhosts/.../httpdocs
-mkdir -p .local-node-tools
-tar -xJf node-v22.14.0-linux-x64.tar.xz -C .local-node-tools
-mv .local-node-tools/node-v22.14.0-linux-x64 .local-node-tools/node
-```
+#### Option C — CI builds, server only runs the app
 
-Then you have **`/httpdocs/.local-node-tools/node/bin/node`** (chroot path). The deploy script looks for that layout automatically. Alternatively set **`NODE_VENDOR_ROOT`** (e.g. in **`.plesk-node-env.sh`**) to that directory.
+Build in **GitHub Actions** (or similar) and deploy the built app or `standalone` output; the server does not need `npm` in a Git hook. See for example [GitHub CI/CD Next.js on Plesk](https://www.hennio.dev/github-cicd-nextjs-on-plesk/).
 
-#### Command
+#### If you must use a chrooted Git hook
 
-Plesk may invoke hooks with `sh`. **Call bash explicitly** from the **repository root**:
+Do not rely on `/usr/bin/npm` or the stock `bin/npm` wrapper (`#!/usr/bin/env`). Vendor a **Linux x64** [Node binary](https://nodejs.org/en/download/) under **`httpdocs/.../naturalisation-tracker/tools/node/`** (host path like `/var/www/vhosts/<domain>/httpdocs/naturalisation-tracker/tools/node`), or put **`export PATH=...`** / **`node` + `npm-cli.js` paths** in **`.plesk-deploy-env.sh`**. `tools/node/` is gitignored and may be removed on deploy unless you restore it after each pull.
 
-```bash
-bash scripts/plesk-post-deploy.sh
-```
+**Related:** [Plesk KB: `usr/bin/env: node: No such file or directory`](https://www.plesk.com/kb/support/unable-to-use-npm-install-for-node-js-application-in-plesk-usr-bin-env-node-no-such-file-or-directory), [forum: npm in Git deploy actions](https://talk.plesk.com/threads/npm-build-actions-in-deploy-actions-w-the-git-extension.393283/).
 
-The script tries, in order: **`$HOME` / nvm**, optional **`.plesk-node-env.sh`**, then normal **`/opt/plesk`** and **`/usr`** paths (when not chrooted), then runs `npm ci`, Prisma generate/push, and `npm run build` under `web/`.
-
-**Server-only override** (not in git; path is in `.gitignore`):
-
-```bash
-# naturalisation-tracker/.plesk-node-env.sh — paths must exist inside chroot if applicable
-export NPM=/path/to/npm
-# or:
-# export NODE_BIN=/path/to/node
-# export NPM_CLI=/path/to/npm-cli.js
-```
-
-**Non-chroot one-liner** (replace domain and paths; useless inside a strict chroot):
-
-```bash
-PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web ci --include=dev --no-audit --no-fund && PATH=/usr/bin:/bin:/opt/plesk/node/25/bin:/opt/plesk/node/24/bin:$PATH /usr/bin/npm --prefix /var/www/vhosts/YOUR_DOMAIN/httpdocs/naturalisation-tracker/web run build
-```
-
-Optional: `npm run deploy:plesk` in `web/package.json` chains Prisma generate, `db push`, and `next build` in one script if you prefer that over the shell steps.
+`npm run deploy:plesk` in `web/package.json` can replace the separate prisma + build commands in custom setups.
 
 ### 4) First deploy checklist
 

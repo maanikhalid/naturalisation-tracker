@@ -28,7 +28,8 @@ yarn-error.log*
 .env*.local
 .env
 
-# server-only Plesk deploy path overrides (never commit)
+# server-only Plesk deploy overrides (never commit)
+.plesk-deploy-env.sh
 .plesk-node-env.sh
 
 # Vendored Node.js binary tree for Plesk chroot deploy (see README; large)
