@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { fetchRedditThreadComments } from "@/lib/reddit-thread-fetch";
+import { fetchRedditThreadComments, redditOutboundProxyEnv } from "@/lib/reddit-thread-fetch";
 
 function redditFetchHeaders(): HeadersInit {
   const ua =
@@ -274,13 +274,19 @@ export async function POST(request: Request) {
     }
   }
 
+  const proxySource = redditOutboundProxyEnv();
+
   return NextResponse.json({
     probeOnly,
     imported: probeOnly ? null : imported,
     wouldImport: probeOnly ? imported : null,
     threads,
     limits: { maxMoreBatches, moreBatchSize, delayMs },
+    redditOutboundProxy: {
+      enabled: proxySource !== null,
+      envVar: proxySource,
+    },
     hint:
-      "If wouldImport/imported is 0 but commentsLoaded > 0, see skippedAlreadyInDatabase (already stored) or commentsMatchingTimeline (text format). Test fetch: POST { probeOnly: true }.",
+      "If wouldImport/imported is 0 but commentsLoaded > 0, see skippedAlreadyInDatabase or commentsMatchingTimeline. If Reddit returns 403 on the server only, set REDDIT_HTTPS_PROXY and restart Node. Test fetch: POST { probeOnly: true }.",
   });
 }

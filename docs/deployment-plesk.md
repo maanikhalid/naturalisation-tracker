@@ -39,6 +39,17 @@ Example:
 DATABASE_URL="mysql://db_user:db_password@localhost:3306/db_name"
 ```
 
+#### Reddit sync: HTTP 403 on the server but not your laptop
+
+Reddit often returns **403** (HTML, not JSON) for **hosting / datacenter IPs**. You may see **HTTP 200** from `curl` on a home connection and **403** from SSH on Plesk for the same `.json` URL.
+
+**This app** can send Reddit traffic through an HTTP(S) proxy (only those requests, if you use the dedicated variable):
+
+- **`REDDIT_HTTPS_PROXY`** — e.g. `http://user:pass@proxy.example.com:8080`
+- **`HTTPS_PROXY` / `HTTP_PROXY`** — fallback if `REDDIT_HTTPS_PROXY` is unset
+
+Set the variable in the Node.js app environment, restart the app, then use admin **Test fetch only** or `REDDIT_HTTPS_PROXY=... bash scripts/reddit-curl-check.sh 'https://...'`.
+
 ### 3) Install dependencies and build — use the simplest option that matches your host
 
 Plesk + Git hooks are a common source of pain: **Additional deployment actions** may run in a **chroot** with no `/usr/bin/env`, no `/opt/plesk` in `PATH`, and **`HOME=/`**, while SSH as root works fine. Official and community guidance is to **avoid fighting that in a giant shell script** and use one of these instead.

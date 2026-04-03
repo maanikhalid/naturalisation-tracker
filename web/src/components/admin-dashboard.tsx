@@ -77,6 +77,7 @@ export function AdminDashboard({
       sampleComments?: Array<{ id?: string; preview?: string }>;
     }>;
     limits?: { maxMoreBatches?: number; moreBatchSize?: number; delayMs?: number };
+    redditOutboundProxy?: { enabled?: boolean; envVar?: string | null };
   };
 
   function formatRedditSyncMessage(data: RedditSyncPayload): string {
@@ -89,6 +90,14 @@ export function AdminDashboard({
     if (data.limits) {
       lines.push(
         `Limits: ${String(data.limits.maxMoreBatches)} more batches × ${String(data.limits.moreBatchSize)} ids, ${String(data.limits.delayMs)}ms delay (REDDIT_SYNC_* env).`
+      );
+    }
+    const px = data.redditOutboundProxy;
+    if (px?.enabled && px.envVar) {
+      lines.push(`Reddit outbound proxy: ON (${px.envVar}; URL not shown).`);
+    } else {
+      lines.push(
+        `Reddit outbound proxy: OFF. Server-only HTTP 403 while laptop works means Reddit is blocking the host IP — set REDDIT_HTTPS_PROXY in Plesk and restart Node.`
       );
     }
     for (const t of data.threads ?? []) {
