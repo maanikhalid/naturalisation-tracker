@@ -29,6 +29,11 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
           <p className="govuk-body-s realtime-stats__label">
             Who can expect approvals?
           </p>
+          <p className="govuk-body-s realtime-stats__hint govuk-!-margin-bottom-2">
+            Each pending case uses the median app-to-approval time of{" "}
+            <strong>approved</strong> submissions from the same application month,
+            widening by month up to ±6 months if there are fewer than three peers.
+          </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.expectApprovalsLabel ?? "Insufficient data"}
           </p>
@@ -36,8 +41,9 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
 
         <article className="realtime-stats__block realtime-stats__block--median-wait">
           <p className="govuk-body-s realtime-stats__label">
-            Median wait time between <strong>application date</strong> and{" "}
-            <strong>processing</strong> (last 30 apps):
+            Median wait from <strong>application date</strong> to{" "}
+            <strong>approval</strong> among the 30 approved cases with the most
+            recent <strong>application dates</strong>:
           </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.medianWaitLast30 != null
@@ -70,7 +76,8 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
 
         <article className="realtime-stats__block realtime-stats__block--range">
           <p className="govuk-body-s realtime-stats__label">
-            Longest and shortest processing time (last 6 months):
+            Longest and shortest processing time for cases{" "}
+            <strong>submitted</strong> in the last 6 months (among approved):
           </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.minDur != null && stats.maxDur != null

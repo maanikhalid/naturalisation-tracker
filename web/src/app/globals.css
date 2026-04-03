@@ -130,6 +130,11 @@ samp {
   margin-bottom: 0.5rem;
 }
 
+.realtime-stats__hint {
+  color: #505a5f;
+  margin-bottom: 0.5rem;
+}
+
 .realtime-stats__value {
   margin: 0;
 }
