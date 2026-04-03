@@ -104,6 +104,56 @@ samp {
   padding: 16px;
 }
 
+.realtime-stats__banner {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: #0b0c0c;
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.realtime-stats__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.realtime-stats__block {
+  margin: 0;
+  padding: 1rem 1rem 1.25rem;
+  border: 0;
+}
+
+.realtime-stats__label {
+  margin-bottom: 0.5rem;
+}
+
+.realtime-stats__value {
+  margin: 0;
+}
+
+.realtime-stats__block--expect {
+  background: #cce2d8;
+}
+
+.realtime-stats__block--median-wait {
+  background: #f3f2f1;
+}
+
+.realtime-stats__block--latest {
+  background: #ffdd00;
+}
+
+.realtime-stats__block--median-app {
+  background: #f6d7d2;
+}
+
+.realtime-stats__block--range {
+  background: #d2e2f1;
+}
+
 .govuk-header__navigation {
   margin: 0;
 }

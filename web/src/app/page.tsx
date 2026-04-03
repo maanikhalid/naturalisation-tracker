@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { buildRealtimeStats } from "@/lib/realtime-stats";
 import { buildStats } from "@/lib/stats";
+import { RealTimeStatistics } from "@/components/real-time-statistics";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ export default async function HomePage() {
         biometricDate: true,
         approvalDate: true,
         sourceType: true,
+        createdAt: true,
       },
     }),
     prisma.timelineEntry.count({ where: { isRemoved: true } }),
@@ -23,6 +26,7 @@ export default async function HomePage() {
     }),
   ]);
   const stats = buildStats(rows);
+  const realtime = buildRealtimeStats(rows);
 
   return (
     <main className="govuk-width-container app-main">
@@ -31,6 +35,8 @@ export default async function HomePage() {
         Community-reported timelines only. This is not an official Home Office
         service.
       </p>
+
+      <RealTimeStatistics stats={realtime} />
 
       <div className="kpi-grid">
         <article className="kpi-card">
