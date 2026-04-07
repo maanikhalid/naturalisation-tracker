@@ -9,7 +9,6 @@ const NAV_LINKS = [
   { href: "/data", label: "Data explorer" },
   { href: "/about", label: "About" },
   { href: "/contributors", label: "Contributors" },
-  { href: "/admin", label: "Admin" },
 ] as const;
 
 export function SiteHeader() {
@@ -47,39 +46,44 @@ export function SiteHeader() {
         >
           Naturalisation Tracker
         </Link>
-        <div className="app-site-header__menu-wrap" ref={wrapRef}>
-          <button
-            type="button"
-            className="govuk-button govuk-button--secondary app-site-header__menu-button"
-            aria-expanded={open}
-            aria-haspopup="true"
-            aria-controls="site-header-menu"
-            id="site-header-menu-button"
-            onClick={() => setOpen((v) => !v)}
-          >
-            Menu
-          </button>
-          {open ? (
-            <ul
-              id="site-header-menu"
-              className="app-site-header__dropdown"
-              role="menu"
-              aria-labelledby="site-header-menu-button"
+        <div className="app-site-header__actions">
+          <Link href="/submit" className="govuk-button app-site-header__submit-button">
+            Submit your timeline
+          </Link>
+          <div className="app-site-header__menu-wrap" ref={wrapRef}>
+            <button
+              type="button"
+              className="govuk-button govuk-button--secondary app-site-header__menu-button"
+              aria-expanded={open}
+              aria-haspopup="true"
+              aria-controls="site-header-menu"
+              id="site-header-menu-button"
+              onClick={() => setOpen((v) => !v)}
             >
-              {NAV_LINKS.map(({ href, label }) => (
-                <li key={href} className="app-site-header__dropdown-item" role="none">
-                  <Link
-                    href={href}
-                    className="govuk-link app-site-header__dropdown-link"
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+              Menu
+            </button>
+            {open ? (
+              <ul
+                id="site-header-menu"
+                className="app-site-header__dropdown"
+                role="menu"
+                aria-labelledby="site-header-menu-button"
+              >
+                {NAV_LINKS.map(({ href, label }) => (
+                  <li key={href} className="app-site-header__dropdown-item" role="none">
+                    <Link
+                      href={href}
+                      className="govuk-link app-site-header__dropdown-link"
+                      role="menuitem"
+                      onClick={() => setOpen(false)}
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
       </div>
     </header>

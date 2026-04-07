@@ -48,7 +48,7 @@ export default async function HomePage() {
           <p className="govuk-heading-m">{stats.median} days</p>
         </article>
         <article className="kpi-card">
-          <p className="govuk-body-s">Approved cases</p>
+          <p className="govuk-body-s">Processed cases</p>
           <p className="govuk-heading-m">{stats.approvedCount}</p>
         </article>
         <article className="kpi-card">
@@ -80,7 +80,7 @@ export default async function HomePage() {
             <tr className="govuk-table__row">
               <th className="govuk-table__header">Month</th>
               <th className="govuk-table__header">Total</th>
-              <th className="govuk-table__header">Approved</th>
+              <th className="govuk-table__header">Processed</th>
               <th className="govuk-table__header">Rate</th>
             </tr>
           </thead>
@@ -100,10 +100,6 @@ export default async function HomePage() {
       <p className="govuk-body">
         <Link href="/submit" className="govuk-link">
           Submit your timeline
-        </Link>
-        {" | "}
-        <Link href="/admin" className="govuk-link">
-          Admin dashboard
         </Link>
       </p>
     </main>

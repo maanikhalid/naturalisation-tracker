@@ -27,4 +27,21 @@ npm run prisma:generate
 npm run prisma:push
 npm run build
 
+restart_done=0
+
+# Preferred: set PLESK_NODE_RESTART_COMMAND in .plesk-deploy-env.sh for your server.
+if [[ -n "${PLESK_NODE_RESTART_COMMAND:-}" ]]; then
+  echo "Running custom restart command..."
+  bash -lc "${PLESK_NODE_RESTART_COMMAND}"
+  restart_done=1
+fi
+
+# Passenger-based restart (common on Plesk Node hosting).
+if [[ "${restart_done}" -eq 0 ]]; then
+  mkdir -p tmp
+  touch tmp/restart.txt
+  echo "Triggered app restart via tmp/restart.txt"
+  restart_done=1
+fi
+
 echo "Deployment actions complete."

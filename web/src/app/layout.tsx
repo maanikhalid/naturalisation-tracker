@@ -88,6 +88,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <PwaRegister />
         <SiteHeader />
         {children}
+        <footer className="app-site-footer">
+          <p className="app-site-footer__text">
+            This tracker uses community-submitted timelines and automated processing to
+            estimate updates.
+          </p>
+          <p className="app-site-footer__text">
+            Information may be incomplete or inaccurate, so please verify details
+            independently before relying on them.
+          </p>
+        </footer>
       </body>
     </html>
   );
