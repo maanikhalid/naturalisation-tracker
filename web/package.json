@@ -22,7 +22,11 @@
     "close:october-pending": "node scripts/close-off-october-pending.mjs --apply",
     "close:october-pending:dry": "node scripts/close-off-october-pending.mjs --dry-run",
     "undo:october-closeoff": "node scripts/undo-october-closeoff-from-backup.mjs --apply",
-    "undo:october-closeoff:dry": "node scripts/undo-october-closeoff-from-backup.mjs --dry-run"
+    "undo:october-closeoff:dry": "node scripts/undo-october-closeoff-from-backup.mjs --dry-run",
+    "close:january-pending": "node scripts/close-off-january-pending.mjs --apply",
+    "close:january-pending:dry": "node scripts/close-off-january-pending.mjs --dry-run",
+    "undo:january-closeoff": "node scripts/undo-january-closeoff-from-backup.mjs --apply",
+    "undo:january-closeoff:dry": "node scripts/undo-january-closeoff-from-backup.mjs --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
