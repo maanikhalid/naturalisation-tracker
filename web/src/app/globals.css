@@ -281,6 +281,10 @@ samp {
   justify-content: space-between;
 }
 
+.admin-page.govuk-width-container {
+  max-width: 1500px;
+}
+
 .inline-form {
   display: grid;
   grid-template-columns: 1fr 180px 110px 160px;
@@ -297,6 +301,19 @@ samp {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.admin-entries-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.admin-entries-table .govuk-table__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f3f2f1;
+  white-space: nowrap;
 }
 
 @media (max-width: 800px) {

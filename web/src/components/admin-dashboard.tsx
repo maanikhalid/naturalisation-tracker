@@ -337,8 +337,8 @@ export function AdminDashboard({
         <p className="govuk-body">
           Add, edit, or remove entries from both website submissions and Reddit imports.
         </p>
-        <div className="govuk-table__wrapper">
-          <table className="govuk-table">
+        <div className="govuk-table__wrapper admin-entries-table__wrapper">
+          <table className="govuk-table admin-entries-table">
             <thead className="govuk-table__head">
               <tr className="govuk-table__row">
                 <th className="govuk-table__header">Username</th>

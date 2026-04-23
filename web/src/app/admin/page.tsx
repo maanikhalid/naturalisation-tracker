@@ -10,7 +10,7 @@ export default async function AdminPage() {
   const session = await getAdminSession();
   if (!session) {
     return (
-      <main className="govuk-width-container app-main">
+      <main className="govuk-width-container app-main admin-page">
         <h1 className="govuk-heading-l">Admin login</h1>
         <AdminLogin />
       </main>
@@ -31,7 +31,7 @@ export default async function AdminPage() {
   } catch (err) {
     console.error("Admin dashboard: database query failed", err);
     return (
-      <main className="govuk-width-container app-main">
+      <main className="govuk-width-container app-main admin-page">
         <div className="admin-header">
           <h1 className="govuk-heading-l">Admin dashboard</h1>
           <form action={logoutAdmin}>
@@ -106,7 +106,7 @@ export default async function AdminPage() {
   );
 
   return (
-    <main className="govuk-width-container app-main">
+    <main className="govuk-width-container app-main admin-page">
       <div className="admin-header">
         <h1 className="govuk-heading-l">Admin dashboard</h1>
         <form action={logoutAdmin}>
