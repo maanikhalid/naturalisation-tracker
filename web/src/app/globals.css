@@ -303,6 +303,19 @@ samp {
   flex-wrap: wrap;
 }
 
+.admin-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.admin-filter-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .admin-entries-table {
   width: max-content;
   min-width: 100%;

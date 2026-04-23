@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type Entry = {
   id: string;
@@ -49,6 +49,12 @@ type EntryFormState = {
   isVerified: boolean;
 };
 
+type AdminSortField = "applicationDate" | "biometricDate" | "approvalDate";
+type SortDirection = "asc" | "desc";
+type SourceFilter = "all" | "WEBSITE" | "REDDIT";
+type ApprovalFilter = "all" | "approved" | "pending";
+type StatusFilter = "all" | EntryFormState["status"];
+
 const statusOptions: Array<{ value: EntryFormState["status"]; label: string }> = [
   { value: "SUBMITTED", label: "Submitted" },
   { value: "BIOMETRICS_DONE", label: "Biometrics done" },
@@ -78,6 +84,19 @@ function toFormState(entry: Entry): EntryFormState {
   };
 }
 
+function compareNullableDate(
+  a: string | null,
+  b: string | null,
+  direction: SortDirection
+) {
+  const aTime = a ? new Date(a).getTime() : null;
+  const bTime = b ? new Date(b).getTime() : null;
+  if (aTime == null && bTime == null) return 0;
+  if (aTime == null) return direction === "asc" ? 1 : -1;
+  if (bTime == null) return direction === "asc" ? -1 : 1;
+  return direction === "asc" ? aTime - bTime : bTime - aTime;
+}
+
 export function AdminDashboard({
   entries,
   configs,
@@ -88,6 +107,11 @@ export function AdminDashboard({
   const [message, setMessage] = useState("");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingState, setEditingState] = useState<EntryFormState | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortField, setSortField] = useState<AdminSortField>("applicationDate");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [newEntry, setNewEntry] = useState<EntryFormState>({
     username: "",
     applicationMethod: "ONLINE",
@@ -100,6 +124,34 @@ export function AdminDashboard({
     sourceType: "WEBSITE",
     isVerified: true,
   });
+
+  const visibleEntries = useMemo(() => {
+    const filtered = entries.filter((entry) => {
+      if (sourceFilter !== "all" && entry.sourceType !== sourceFilter) return false;
+      if (approvalFilter === "approved" && !entry.approvalDate) return false;
+      if (approvalFilter === "pending" && entry.approvalDate) return false;
+      if (statusFilter !== "all" && entry.status !== statusFilter) return false;
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortField === "approvalDate") {
+        return compareNullableDate(a.approvalDate, b.approvalDate, sortDirection);
+      }
+
+      const aTime = new Date(a[sortField]).getTime();
+      const bTime = new Date(b[sortField]).getTime();
+      return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
+    });
+  }, [approvalFilter, entries, sortDirection, sortField, sourceFilter, statusFilter]);
+
+  function clearFilters() {
+    setSourceFilter("all");
+    setApprovalFilter("all");
+    setStatusFilter("all");
+    setSortField("applicationDate");
+    setSortDirection("desc");
+  }
 
   async function removeEntry(id: string) {
     const reason = window.prompt("Reason for removal", "Spam / false data");
@@ -337,6 +389,97 @@ export function AdminDashboard({
         <p className="govuk-body">
           Add, edit, or remove entries from both website submissions and Reddit imports.
         </p>
+        <div className="admin-filter-grid govuk-!-margin-bottom-4">
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminFilterSource">
+              Source filter
+            </label>
+            <select
+              id="adminFilterSource"
+              className="govuk-select"
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
+            >
+              <option value="all">All sources</option>
+              <option value="WEBSITE">Website only</option>
+              <option value="REDDIT">Reddit only</option>
+            </select>
+          </div>
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminFilterApproval">
+              Approval filter
+            </label>
+            <select
+              id="adminFilterApproval"
+              className="govuk-select"
+              value={approvalFilter}
+              onChange={(event) => setApprovalFilter(event.target.value as ApprovalFilter)}
+            >
+              <option value="all">All entries</option>
+              <option value="approved">Approved only</option>
+              <option value="pending">Pending only</option>
+            </select>
+          </div>
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminFilterStatus">
+              Status filter
+            </label>
+            <select
+              id="adminFilterStatus"
+              className="govuk-select"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            >
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => (
+                <option value={status.value} key={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminSortField">
+              Sort by
+            </label>
+            <select
+              id="adminSortField"
+              className="govuk-select"
+              value={sortField}
+              onChange={(event) => setSortField(event.target.value as AdminSortField)}
+            >
+              <option value="applicationDate">Application date</option>
+              <option value="biometricDate">Biometric date</option>
+              <option value="approvalDate">Approval date</option>
+            </select>
+          </div>
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminSortDirection">
+              Direction
+            </label>
+            <select
+              id="adminSortDirection"
+              className="govuk-select"
+              value={sortDirection}
+              onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+            >
+              <option value="desc">Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+          </div>
+        </div>
+        <div className="admin-filter-meta govuk-!-margin-bottom-3">
+          <p className="govuk-body-s govuk-!-margin-bottom-0">
+            Showing {visibleEntries.length} of {entries.length} entries
+          </p>
+          <button
+            type="button"
+            className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+            onClick={clearFilters}
+          >
+            Clear filters
+          </button>
+        </div>
         <div className="govuk-table__wrapper admin-entries-table__wrapper">
           <table className="govuk-table admin-entries-table">
             <thead className="govuk-table__head">
@@ -461,7 +604,7 @@ export function AdminDashboard({
                   </button>
                 </td>
               </tr>
-              {entries.map((entry) => (
+              {visibleEntries.map((entry) => (
                 <tr className="govuk-table__row" key={entry.id}>
                   {editingEntryId === entry.id && editingState ? (
                     <>
