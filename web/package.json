@@ -12,7 +12,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "import:form-an-sheet": "node scripts/import-form-an-spreadsheet.mjs",
-    "import:form-an-sheet:dry": "node scripts/import-form-an-spreadsheet.mjs --dry-run"
+    "import:form-an-sheet:dry": "node scripts/import-form-an-spreadsheet.mjs --dry-run",
+    "close:november-pending": "node scripts/close-off-november-pending.mjs --apply",
+    "close:november-pending:dry": "node scripts/close-off-november-pending.mjs --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

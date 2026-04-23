@@ -18,15 +18,11 @@ export default async function AdminPage() {
   }
 
   let entries;
-  let configs;
   try {
-    [entries, configs] = await Promise.all([
-      prisma.timelineEntry.findMany({
-        where: { isRemoved: false },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.redditTrackingConfig.findMany({ orderBy: { createdAt: "desc" } }),
-    ]);
+    entries = await prisma.timelineEntry.findMany({
+      where: { isRemoved: false },
+      orderBy: { createdAt: "desc" },
+    });
   } catch (err) {
     console.error("Admin dashboard: database query failed", err);
     return (
@@ -88,22 +84,6 @@ export default async function AdminPage() {
     })
   );
 
-  const serializedConfigs = configs.map(
-    (config: {
-      id: string;
-      postUrl: string;
-      syncIntervalMins: number;
-      active: boolean;
-      lastSyncedAt: Date | null;
-    }) => ({
-    id: config.id,
-    postUrl: config.postUrl,
-    syncIntervalMins: config.syncIntervalMins,
-    active: config.active,
-    lastSyncedAt: config.lastSyncedAt ? config.lastSyncedAt.toISOString() : null,
-    })
-  );
-
   return (
     <main className="govuk-width-container app-main admin-page">
       <div className="admin-header">
@@ -114,7 +94,7 @@ export default async function AdminPage() {
           </button>
         </form>
       </div>
-      <AdminDashboard entries={serializedEntries} configs={serializedConfigs} />
+      <AdminDashboard entries={serializedEntries} />
     </main>
   );
 }
