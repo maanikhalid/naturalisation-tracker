@@ -66,16 +66,21 @@ node scripts/undo-january-closeoff-from-backup.mjs --backup "scripts/backups/jan
 
 ---
 
-## November 2025 Closeoff
+## November 2025 Closeoff (with undo)
 
-The current November script (`close-off-november-pending.mjs`) does not create backup files.
+### Apply
 
-If you already ran the November apply script, undo options are:
+```bash
+npm run close:november-pending:dry
+npm run close:november-pending
+```
 
-1. Restore from a DB snapshot/backup taken before the run, or
-2. Manually patch affected rows by ID if you logged output externally.
+### Undo
 
-Recommended next step: replace the November script with a backup-enabled version before running it again.
+```bash
+node scripts/undo-november-closeoff-from-backup.mjs --backup "scripts/backups/nov-2025-closeoff-backup-YYYYMMDD-HHMMSSZ.json" --dry-run
+node scripts/undo-november-closeoff-from-backup.mjs --backup "scripts/backups/nov-2025-closeoff-backup-YYYYMMDD-HHMMSSZ.json" --apply
+```
 
 ---
 

@@ -64,3 +64,10 @@ Minimum production environment:
 - `NODE_ENV=production`  
 
 `PORT` is usually set by the host.
+
+Optional realtime-stat tuning (for "Who can expect approvals?"):
+
+- `EXPECT_APPROVALS_RECENT_LOOKBACK_DAYS` — default `21` (allowed 7-60)
+- `EXPECT_APPROVALS_RECENT_MIN_COUNT` — default `8` (allowed 3-50)
+- `EXPECT_APPROVALS_RECENT_P_LOW` — default `25` (allowed 1-49)
+- `EXPECT_APPROVALS_RECENT_P_HIGH` — default `75` (allowed `P_LOW+1` to 99)

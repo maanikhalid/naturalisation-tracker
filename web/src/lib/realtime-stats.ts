@@ -77,6 +77,33 @@ const FRONTIER_MAX_BINS = 2;
 const FRONTIER_PENDING_P_LOW = 35;
 const FRONTIER_PENDING_P_HIGH = 65;
 
+function readEnvNumberInt(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) ? n : fallback;
+}
+
+function readExpectApprovalsConfig() {
+  const lookbackDays = Math.min(
+    60,
+    Math.max(7, readEnvNumberInt("EXPECT_APPROVALS_RECENT_LOOKBACK_DAYS", 21))
+  );
+  const minCount = Math.min(
+    50,
+    Math.max(3, readEnvNumberInt("EXPECT_APPROVALS_RECENT_MIN_COUNT", 8))
+  );
+  const pLow = Math.min(
+    49,
+    Math.max(1, readEnvNumberInt("EXPECT_APPROVALS_RECENT_P_LOW", 25))
+  );
+  const pHigh = Math.min(
+    99,
+    Math.max(pLow + 1, readEnvNumberInt("EXPECT_APPROVALS_RECENT_P_HIGH", 75))
+  );
+  return { lookbackDays, minCount, pLow, pHigh };
+}
+
 function expectApprovalsApplicationDateRange(
   rows: RealtimeStatsInput[],
   opts: { minTotal: number; minRate: number; maxRate: number }
@@ -173,9 +200,39 @@ function expectApprovalsApplicationDateRange(
   };
 }
 
+function expectApprovalsFromRecentApprovals(
+  approvedRows: RealtimeStatsInput[],
+  asOf: dayjs.Dayjs,
+  cfg: { lookbackDays: number; minCount: number; pLow: number; pHigh: number }
+): { min: dayjs.Dayjs; max: dayjs.Dayjs; count: number } | null {
+  const from = asOf.subtract(cfg.lookbackDays, "day").valueOf();
+  const to = asOf.valueOf();
+
+  const appDateMillis = approvedRows
+    .filter((e) => {
+      const approvalMillis = dayjs(e.approvalDate!).valueOf();
+      return approvalMillis >= from && approvalMillis <= to;
+    })
+    .map((e) => dayjs(e.applicationDate).valueOf())
+    .sort((a, b) => a - b);
+
+  if (appDateMillis.length < cfg.minCount) return null;
+
+  let low = percentileLinear(appDateMillis, cfg.pLow);
+  let high = percentileLinear(appDateMillis, cfg.pHigh);
+  if (low > high) [low, high] = [high, low];
+
+  return {
+    min: dayjs(low),
+    max: dayjs(high),
+    count: appDateMillis.length,
+  };
+}
+
 export function buildRealtimeStats(rows: RealtimeStatsInput[], asOfDate: Date = new Date()) {
   const approved = rows.filter((e) => e.approvalDate);
   const asOf = dayjs(asOfDate);
+  const expectCfg = readExpectApprovalsConfig();
 
   const last30BySubmitDate = [...approved]
     .sort(
@@ -189,15 +246,17 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[], asOfDate: Date = 
   );
   const medianWaitLast30 = medianDays(last30Durations);
 
-  let expectApprovalsLabel: string | null = null;
+  const recentRange = expectApprovalsFromRecentApprovals(approved, asOf, expectCfg);
   const frontier = expectApprovalsApplicationDateRange(rows, {
     minTotal: 7,
     minRate: 0.22,
     maxRate: 0.98,
   });
-  if (frontier) {
-    expectApprovalsLabel = formatRangeShort(frontier.min, frontier.max);
-  }
+  const expectApprovalsRange = recentRange ?? frontier;
+  const expectApprovalsLabel = expectApprovalsRange
+    ? formatRangeShort(expectApprovalsRange.min, expectApprovalsRange.max)
+    : null;
+  const expectApprovalsBasis = recentRange ? "recent-approvals" : frontier ? "pending-frontier" : null;
 
   let latestAppDateAmongApproved: {
     applicationDate: dayjs.Dayjs;
@@ -241,6 +300,9 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[], asOfDate: Date = 
     medianWaitLast30:
       medianWaitLast30 != null ? Math.round(medianWaitLast30) : null,
     expectApprovalsLabel,
+    expectApprovalsBasis,
+    recentApprovalsCount: recentRange?.count ?? 0,
+    expectApprovalsRecentLookbackDays: expectCfg.lookbackDays,
     latestAppDateAmongApproved,
     medianAppDateLast4,
     acceptedLast4Count: acceptedLast4Days.length,

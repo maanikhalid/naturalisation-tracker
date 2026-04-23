@@ -10,6 +10,9 @@
  * - approval range: 2026-03-29 .. 2026-04-23
  * - close ratio: 90%
  *
+ * Backup:
+ * - In apply mode, writes a JSON backup of original values for exact undo.
+ *
  * Usage (from web/):
  *   node scripts/close-off-november-pending.mjs --dry-run
  *   node scripts/close-off-november-pending.mjs --apply
@@ -22,6 +25,8 @@
  *   --approval-end 2026-04-23
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 function hasFlag(flag) {
@@ -67,6 +72,17 @@ function shuffle(array) {
   return out;
 }
 
+function timestampForFile() {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mi = String(now.getUTCMinutes()).padStart(2, "0");
+  const ss = String(now.getUTCSeconds()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}-${hh}${mi}${ss}Z`;
+}
+
 async function main() {
   const dryRun = hasFlag("--dry-run") || !hasFlag("--apply");
   const apply = hasFlag("--apply");
@@ -103,6 +119,7 @@ async function main() {
 
   const monthStart = new Date(Date.UTC(year, month - 1, 1));
   const monthEndExclusive = new Date(Date.UTC(year, month, 1));
+  const backupDir = path.resolve(process.cwd(), "scripts/backups");
 
   const prisma = new PrismaClient();
   try {
@@ -117,7 +134,11 @@ async function main() {
       },
       select: {
         id: true,
+        username: true,
         applicationDate: true,
+        approvalDate: true,
+        ceremonyDate: true,
+        status: true,
         sourceType: true,
       },
       orderBy: { createdAt: "desc" },
@@ -134,20 +155,48 @@ async function main() {
       return {
         id: row.id,
         sourceType: row.sourceType,
+        username: row.username,
         applicationDate: row.applicationDate.toISOString().slice(0, 10),
-        approvalDate: approvalDate.toISOString().slice(0, 10),
-        ceremonyDate: ceremonyDate.toISOString().slice(0, 10),
+        newApprovalDate: approvalDate.toISOString().slice(0, 10),
+        newCeremonyDate: ceremonyDate.toISOString().slice(0, 10),
+        newStatus: "APPROVED",
         ceremonyOffsetDays,
       };
     });
 
+    let backupPath = null;
     if (apply) {
+      fs.mkdirSync(backupDir, { recursive: true });
+      const stamp = timestampForFile();
+      backupPath = path.join(backupDir, `nov-2025-closeoff-backup-${stamp}.json`);
+
+      const backupPayload = {
+        kind: "november-2025-closeoff-backup",
+        createdAt: new Date().toISOString(),
+        rules: {
+          targetYear: year,
+          targetMonth: month,
+          ratio,
+          approvalStart: approvalStartIso,
+          approvalEnd: approvalEndIso,
+          ceremonyOffsetDays: "2-14",
+          sources: "both",
+        },
+        rows: selected.map((row) => ({
+          id: row.id,
+          oldApprovalDate: row.approvalDate ? row.approvalDate.toISOString() : null,
+          oldCeremonyDate: row.ceremonyDate ? row.ceremonyDate.toISOString() : null,
+          oldStatus: row.status,
+        })),
+      };
+      fs.writeFileSync(backupPath, JSON.stringify(backupPayload, null, 2), "utf8");
+
       for (const row of planned) {
         await prisma.timelineEntry.update({
           where: { id: row.id },
           data: {
-            approvalDate: parseIsoDayUtc(row.approvalDate),
-            ceremonyDate: parseIsoDayUtc(row.ceremonyDate),
+            approvalDate: parseIsoDayUtc(row.newApprovalDate),
+            ceremonyDate: parseIsoDayUtc(row.newCeremonyDate),
             status: "APPROVED",
           },
         });
@@ -177,6 +226,7 @@ async function main() {
             selectedForClosure: targetCount,
             unchangedPendingAfterRun: pendingCount - targetCount,
           },
+          backupPath,
           sample: planned.slice(0, 20),
         },
         null,

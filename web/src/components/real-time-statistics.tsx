@@ -28,7 +28,10 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
       <div className="realtime-stats__stack">
         <article className="realtime-stats__block realtime-stats__block--expect">
           <p className="govuk-body-s realtime-stats__label">
-            Who can expect approvals?
+            Who can expect approvals?{" "}
+            {stats.expectApprovalsBasis === "recent-approvals"
+              ? `(based on last ${stats.recentApprovalsCount} approvals in the past ${stats.expectApprovalsRecentLookbackDays} days)`
+              : "(based on pending frontier)"}
           </p>
           <p className="govuk-heading-m realtime-stats__value">
             {stats.expectApprovalsLabel ?? "Insufficient data"}

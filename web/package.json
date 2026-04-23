@@ -15,6 +15,8 @@
     "import:form-an-sheet:dry": "node scripts/import-form-an-spreadsheet.mjs --dry-run",
     "close:november-pending": "node scripts/close-off-november-pending.mjs --apply",
     "close:november-pending:dry": "node scripts/close-off-november-pending.mjs --dry-run",
+    "undo:november-closeoff": "node scripts/undo-november-closeoff-from-backup.mjs --apply",
+    "undo:november-closeoff:dry": "node scripts/undo-november-closeoff-from-backup.mjs --dry-run",
     "close:december-pending": "node scripts/close-off-december-pending.mjs --apply",
     "close:december-pending:dry": "node scripts/close-off-december-pending.mjs --dry-run",
     "undo:december-closeoff": "node scripts/undo-december-closeoff-from-backup.mjs --apply",
