@@ -29,7 +29,8 @@
     "close:january-pending:dry": "node scripts/close-off-january-pending.mjs --dry-run",
     "undo:january-closeoff": "node scripts/undo-january-closeoff-from-backup.mjs --apply",
     "undo:january-closeoff:dry": "node scripts/undo-january-closeoff-from-backup.mjs --dry-run",
-    "check:approved-home-office-email": "node scripts/check-approved-home-office-email.mjs"
+    "check:approved-home-office-email": "node scripts/check-approved-home-office-email.mjs --dry-run",
+    "fix:approved-home-office-email": "node scripts/check-approved-home-office-email.mjs --apply"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
