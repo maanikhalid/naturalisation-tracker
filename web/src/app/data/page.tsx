@@ -7,7 +7,6 @@ export default async function DataPage() {
   const entries = await prisma.timelineEntry.findMany({
     where: { isRemoved: false },
     orderBy: { applicationDate: "desc" },
-    take: 500,
   });
 
   type DataRow = {
