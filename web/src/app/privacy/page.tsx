@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy policy",
   description:
-    "How the UK Naturalisation Tracker handles analytics, ad personalisation consent, and user data.",
+    "How the UK Naturalisation Tracker handles analytics, Google AdSense processing, and user data.",
 };
 
 export default function PrivacyPage() {
@@ -19,17 +19,18 @@ export default function PrivacyPage() {
       <ul className="govuk-list govuk-list--bullet">
         <li>Timeline dates and optional username submitted through the form.</li>
         <li>Basic visit analytics through Google Tag Manager.</li>
-        <li>Optional advertising consent choice (accept/reject).</li>
+        <li>Advertising-related consent signals managed through Google CMP.</li>
       </ul>
 
       <h2 className="govuk-heading-m">Advertising</h2>
       <p className="govuk-body">
         We may display Google AdSense advertisements to help fund hosting and
-        maintenance. Ads are loaded only after you explicitly accept ad cookies.
+        maintenance.
       </p>
       <p className="govuk-body">
-        Google may process data according to its own privacy terms when ads are
-        enabled. You can change your choice any time on the cookie settings page.
+        For users in EEA/UK/Switzerland, consent for ad-related processing is managed
+        through Google&apos;s Consent Management Platform (CMP). Google may process data
+        according to its own privacy terms when ads are enabled.
       </p>
 
       <h2 className="govuk-heading-m">Data quality disclaimer</h2>

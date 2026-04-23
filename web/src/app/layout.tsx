@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { AdSenseScript } from "@/components/adsense-script";
-import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { PwaRegister } from "@/components/pwa-register";
 import { SiteHeader } from "@/components/site-header";
 import { getSiteUrl } from "@/lib/site";
@@ -92,7 +91,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <AdSenseScript />
         <SiteHeader />
         {children}
-        <CookieConsentBanner />
         <footer className="app-site-footer">
           <p className="app-site-footer__text">
             This tracker uses community-submitted timelines and automated processing to

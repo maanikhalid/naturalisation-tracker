@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ADSENSE_CLIENT, canRenderAds } from "@/lib/adsense";
-import { CONSENT_CHANGE_EVENT, readConsent } from "@/components/consent-utils";
 
 declare global {
   interface Window {
@@ -17,23 +16,9 @@ type AdSlotProps = {
 export function AdSlot({ slot }: AdSlotProps) {
   const adRef = useRef<HTMLModElement>(null);
   const didRequestAdRef = useRef(false);
-  const [consentAccepted, setConsentAccepted] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return readConsent() === "accepted";
-  });
-
-  useEffect(() => {
-    function onConsentChanged() {
-      setConsentAccepted(readConsent() === "accepted");
-    }
-
-    window.addEventListener(CONSENT_CHANGE_EVENT, onConsentChanged);
-    return () => window.removeEventListener(CONSENT_CHANGE_EVENT, onConsentChanged);
-  }, []);
 
   useEffect(() => {
     if (
-      !consentAccepted ||
       !canRenderAds() ||
       !slot ||
       didRequestAdRef.current ||
@@ -48,9 +33,9 @@ export function AdSlot({ slot }: AdSlotProps) {
     } catch {
       // Keep page stable if ad script is blocked/unavailable.
     }
-  }, [consentAccepted, slot]);
+  }, [slot]);
 
-  if (!slot || !canRenderAds() || !consentAccepted) return null;
+  if (!slot || !canRenderAds()) return null;
 
   return (
     <section className="app-ad-slot" aria-label="Advertisement">
