@@ -8,6 +8,7 @@ type DataRow = {
   applicationDate: string;
   biometricDate: string;
   approvalDate: string | null;
+  createdAt: string;
   status: string;
   sourceType: "WEBSITE" | "REDDIT";
 };
@@ -36,9 +37,17 @@ function compareNullableDates(
 }
 
 export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
+  const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>("applicationDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
+
+  const latestAdded = useMemo(() => {
+    if (!rows.length) return null;
+    return [...rows].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+  }, [rows]);
 
   const filteredAndSorted = useMemo(() => {
     const filtered = rows.filter((row) => {
@@ -61,59 +70,76 @@ export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
   return (
     <>
       <section className="govuk-!-margin-bottom-4" aria-label="Data explorer filters">
-        <h2 className="govuk-heading-m govuk-!-margin-bottom-2">Filter and sort</h2>
-        <div className="inline-form">
-          <div className="govuk-form-group govuk-!-margin-bottom-0">
-            <label className="govuk-label" htmlFor="approvalFilter">
-              Show entries
-            </label>
-            <select
-              id="approvalFilter"
-              className="govuk-select"
-              value={approvalFilter}
-              onChange={(event) =>
-                setApprovalFilter(event.target.value as ApprovalFilter)
-              }
-            >
-              <option value="all">All entries</option>
-              <option value="approved">Approved only</option>
-              <option value="pending">Pending only</option>
-            </select>
-          </div>
+        <h2 className="govuk-heading-m govuk-!-margin-bottom-2">Data controls</h2>
+        <p className="govuk-body govuk-!-margin-bottom-2">
+          Last added:{" "}
+          {latestAdded
+            ? `${new Date(latestAdded.createdAt).toLocaleString("en-GB")} (${latestAdded.sourceType}${latestAdded.username ? `, ${latestAdded.username}` : ""})`
+            : "No entries yet"}
+        </p>
+        <button
+          type="button"
+          className="govuk-button govuk-button--secondary govuk-!-margin-bottom-2"
+          onClick={() => setShowFilters((current) => !current)}
+          aria-expanded={showFilters}
+        >
+          {showFilters ? "Hide filters" : "Show filters"}
+        </button>
 
-          <div className="govuk-form-group govuk-!-margin-bottom-0">
-            <label className="govuk-label" htmlFor="sortField">
-              Sort by date
-            </label>
-            <select
-              id="sortField"
-              className="govuk-select"
-              value={sortField}
-              onChange={(event) => setSortField(event.target.value as SortField)}
-            >
-              <option value="applicationDate">Application date</option>
-              <option value="biometricDate">Biometric date</option>
-              <option value="approvalDate">Approval date</option>
-            </select>
-          </div>
+        {showFilters ? (
+          <div className="inline-form">
+            <div className="govuk-form-group govuk-!-margin-bottom-0">
+              <label className="govuk-label" htmlFor="approvalFilter">
+                Show entries
+              </label>
+              <select
+                id="approvalFilter"
+                className="govuk-select"
+                value={approvalFilter}
+                onChange={(event) =>
+                  setApprovalFilter(event.target.value as ApprovalFilter)
+                }
+              >
+                <option value="all">All entries</option>
+                <option value="approved">Approved only</option>
+                <option value="pending">Pending only</option>
+              </select>
+            </div>
 
-          <div className="govuk-form-group govuk-!-margin-bottom-0">
-            <label className="govuk-label" htmlFor="sortDirection">
-              Direction
-            </label>
-            <select
-              id="sortDirection"
-              className="govuk-select"
-              value={sortDirection}
-              onChange={(event) =>
-                setSortDirection(event.target.value as SortDirection)
-              }
-            >
-              <option value="desc">Newest first</option>
-              <option value="asc">Oldest first</option>
-            </select>
+            <div className="govuk-form-group govuk-!-margin-bottom-0">
+              <label className="govuk-label" htmlFor="sortField">
+                Sort by date
+              </label>
+              <select
+                id="sortField"
+                className="govuk-select"
+                value={sortField}
+                onChange={(event) => setSortField(event.target.value as SortField)}
+              >
+                <option value="applicationDate">Application date</option>
+                <option value="biometricDate">Biometric date</option>
+                <option value="approvalDate">Approval date</option>
+              </select>
+            </div>
+
+            <div className="govuk-form-group govuk-!-margin-bottom-0">
+              <label className="govuk-label" htmlFor="sortDirection">
+                Direction
+              </label>
+              <select
+                id="sortDirection"
+                className="govuk-select"
+                value={sortDirection}
+                onChange={(event) =>
+                  setSortDirection(event.target.value as SortDirection)
+                }
+              >
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </div>
           </div>
-        </div>
+        ) : null}
       </section>
 
       <div className="govuk-table__wrapper">

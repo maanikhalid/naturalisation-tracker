@@ -16,6 +16,7 @@ export default async function DataPage() {
     applicationDate: Date;
     biometricDate: Date;
     approvalDate: Date | null;
+    createdAt: Date;
     status: string;
     sourceType: "WEBSITE" | "REDDIT";
   };
@@ -26,6 +27,7 @@ export default async function DataPage() {
     applicationDate: row.applicationDate.toISOString(),
     biometricDate: row.biometricDate.toISOString(),
     approvalDate: row.approvalDate ? row.approvalDate.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
     status: row.status,
     sourceType: row.sourceType,
   }));

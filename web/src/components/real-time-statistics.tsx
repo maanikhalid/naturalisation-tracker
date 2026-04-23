@@ -24,9 +24,6 @@ export function RealTimeStatistics({ stats }: { stats: RealtimeStatsResult }) {
       <h2 id="realtime-stats-heading" className="realtime-stats__banner">
         Real-time statistics
       </h2>
-      <p className="govuk-body-s realtime-stats__hint">
-        Data as of {asOfDate.toLocaleString("en-GB")}
-      </p>
 
       <div className="realtime-stats__stack">
         <article className="realtime-stats__block realtime-stats__block--expect">
