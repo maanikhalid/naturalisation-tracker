@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type DataRow = {
   id: string;
@@ -41,6 +41,8 @@ export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
   const [sortField, setSortField] = useState<SortField>("applicationDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
+  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const latestAdded = useMemo(() => {
     if (!rows.length) return null;
@@ -66,6 +68,18 @@ export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
       return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
     });
   }, [approvalFilter, rows, sortDirection, sortField]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [approvalFilter, sortDirection, sortField, rowsPerPage]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, filteredAndSorted.length);
+  const paginatedRows = filteredAndSorted.slice(startIndex, endIndex);
+  const pageRangeLabel =
+    filteredAndSorted.length === 0 ? "0-0" : `${startIndex + 1}-${endIndex}`;
 
   return (
     <>
@@ -140,6 +154,54 @@ export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
             </div>
           </div>
         ) : null}
+        <div className="admin-filter-meta govuk-!-margin-bottom-2">
+          <div>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Total entries in database: {rows.length}
+            </p>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Showing {pageRangeLabel} of {filteredAndSorted.length} filtered entries
+            </p>
+          </div>
+        </div>
+        <div className="admin-pagination-bar govuk-!-margin-bottom-0">
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="dataRowsPerPage">
+              Rows per page
+            </label>
+            <select
+              id="dataRowsPerPage"
+              className="govuk-select"
+              value={String(rowsPerPage)}
+              onChange={(event) => setRowsPerPage(Number(event.target.value))}
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div className="admin-pagination-controls">
+            <button
+              type="button"
+              className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safeCurrentPage <= 1}
+            >
+              Previous
+            </button>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Page {safeCurrentPage} of {totalPages}
+            </p>
+            <button
+              type="button"
+              className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={safeCurrentPage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </section>
 
       <div className="govuk-table__wrapper">
@@ -155,7 +217,7 @@ export function DataExplorerTable({ rows }: { rows: DataRow[] }) {
             </tr>
           </thead>
           <tbody className="govuk-table__body">
-            {filteredAndSorted.map((row) => (
+            {paginatedRows.map((row) => (
               <tr key={row.id} className="govuk-table__row">
                 <td className="govuk-table__cell">{row.username ?? "-"}</td>
                 <td className="govuk-table__cell">{dateLabel(row.applicationDate)}</td>
