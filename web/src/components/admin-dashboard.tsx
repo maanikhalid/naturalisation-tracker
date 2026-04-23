@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Entry = {
   id: string;
@@ -54,6 +54,7 @@ type SortDirection = "asc" | "desc";
 type SourceFilter = "all" | "WEBSITE" | "REDDIT";
 type ApprovalFilter = "all" | "approved" | "pending";
 type StatusFilter = "all" | EntryFormState["status"];
+type ApplicationMonthFilter = "all" | "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12";
 
 const statusOptions: Array<{ value: EntryFormState["status"]; label: string }> = [
   { value: "SUBMITTED", label: "Submitted" },
@@ -110,8 +111,11 @@ export function AdminDashboard({
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [applicationMonthFilter, setApplicationMonthFilter] = useState<ApplicationMonthFilter>("all");
   const [sortField, setSortField] = useState<AdminSortField>("applicationDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
   const [newEntry, setNewEntry] = useState<EntryFormState>({
     username: "",
     applicationMethod: "ONLINE",
@@ -131,6 +135,10 @@ export function AdminDashboard({
       if (approvalFilter === "approved" && !entry.approvalDate) return false;
       if (approvalFilter === "pending" && entry.approvalDate) return false;
       if (statusFilter !== "all" && entry.status !== statusFilter) return false;
+      if (applicationMonthFilter !== "all") {
+        const month = String(new Date(entry.applicationDate).getMonth() + 1).padStart(2, "0");
+        if (month !== applicationMonthFilter) return false;
+      }
       return true;
     });
 
@@ -143,12 +151,41 @@ export function AdminDashboard({
       const bTime = new Date(b[sortField]).getTime();
       return sortDirection === "asc" ? aTime - bTime : bTime - aTime;
     });
-  }, [approvalFilter, entries, sortDirection, sortField, sourceFilter, statusFilter]);
+  }, [
+    approvalFilter,
+    applicationMonthFilter,
+    entries,
+    sortDirection,
+    sortField,
+    sourceFilter,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    sourceFilter,
+    approvalFilter,
+    statusFilter,
+    applicationMonthFilter,
+    sortField,
+    sortDirection,
+    rowsPerPage,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, visibleEntries.length);
+  const paginatedEntries = visibleEntries.slice(startIndex, endIndex);
+  const pageRangeLabel =
+    visibleEntries.length === 0 ? "0-0" : `${startIndex + 1}-${endIndex}`;
 
   function clearFilters() {
     setSourceFilter("all");
     setApprovalFilter("all");
     setStatusFilter("all");
+    setApplicationMonthFilter("all");
     setSortField("applicationDate");
     setSortDirection("desc");
   }
@@ -439,6 +476,33 @@ export function AdminDashboard({
             </select>
           </div>
           <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminFilterApplicationMonth">
+              Application month
+            </label>
+            <select
+              id="adminFilterApplicationMonth"
+              className="govuk-select"
+              value={applicationMonthFilter}
+              onChange={(event) =>
+                setApplicationMonthFilter(event.target.value as ApplicationMonthFilter)
+              }
+            >
+              <option value="all">All months</option>
+              <option value="01">January</option>
+              <option value="02">February</option>
+              <option value="03">March</option>
+              <option value="04">April</option>
+              <option value="05">May</option>
+              <option value="06">June</option>
+              <option value="07">July</option>
+              <option value="08">August</option>
+              <option value="09">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
             <label className="govuk-label" htmlFor="adminSortField">
               Sort by
             </label>
@@ -469,9 +533,14 @@ export function AdminDashboard({
           </div>
         </div>
         <div className="admin-filter-meta govuk-!-margin-bottom-3">
-          <p className="govuk-body-s govuk-!-margin-bottom-0">
-            Showing {visibleEntries.length} of {entries.length} entries
-          </p>
+          <div>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Total entries in database: {entries.length}
+            </p>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Showing {pageRangeLabel} of {visibleEntries.length} filtered entries
+            </p>
+          </div>
           <button
             type="button"
             className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
@@ -479,6 +548,44 @@ export function AdminDashboard({
           >
             Clear filters
           </button>
+        </div>
+        <div className="admin-pagination-bar govuk-!-margin-bottom-3">
+          <div className="govuk-form-group govuk-!-margin-bottom-0">
+            <label className="govuk-label" htmlFor="adminRowsPerPage">
+              Rows per page
+            </label>
+            <select
+              id="adminRowsPerPage"
+              className="govuk-select"
+              value={String(rowsPerPage)}
+              onChange={(event) => setRowsPerPage(Number(event.target.value))}
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div className="admin-pagination-controls">
+            <button
+              type="button"
+              className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safeCurrentPage <= 1}
+            >
+              Previous
+            </button>
+            <p className="govuk-body-s govuk-!-margin-bottom-0">
+              Page {safeCurrentPage} of {totalPages}
+            </p>
+            <button
+              type="button"
+              className="govuk-button govuk-button--secondary govuk-!-margin-bottom-0"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={safeCurrentPage >= totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
         <div className="govuk-table__wrapper admin-entries-table__wrapper">
           <table className="govuk-table admin-entries-table">
@@ -604,7 +711,7 @@ export function AdminDashboard({
                   </button>
                 </td>
               </tr>
-              {visibleEntries.map((entry) => (
+              {paginatedEntries.map((entry) => (
                 <tr className="govuk-table__row" key={entry.id}>
                   {editingEntryId === entry.id && editingState ? (
                     <>

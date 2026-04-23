@@ -316,6 +316,20 @@ samp {
   gap: 12px;
 }
 
+.admin-pagination-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .admin-entries-table {
   width: max-content;
   min-width: 100%;

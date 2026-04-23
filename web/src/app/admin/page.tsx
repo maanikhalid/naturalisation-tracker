@@ -24,7 +24,6 @@ export default async function AdminPage() {
       prisma.timelineEntry.findMany({
         where: { isRemoved: false },
         orderBy: { createdAt: "desc" },
-        take: 200,
       }),
       prisma.redditTrackingConfig.findMany({ orderBy: { createdAt: "desc" } }),
     ]);
