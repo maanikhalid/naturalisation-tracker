@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { AdSlot } from "@/components/ad-slot";
 import { prisma } from "@/lib/db";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { buildRealtimeStats } from "@/lib/realtime-stats";
 import { buildStats } from "@/lib/stats";
 import { RealTimeStatistics } from "@/components/real-time-statistics";
@@ -102,6 +104,7 @@ export default async function HomePage() {
           Submit your timeline
         </Link>
       </p>
+      <AdSlot slot={ADSENSE_SLOTS.home} />
     </main>
   );
 }

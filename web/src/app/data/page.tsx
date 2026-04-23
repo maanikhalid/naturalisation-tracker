@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
+import { AdSlot } from "@/components/ad-slot";
 import { DataExplorerTable } from "@/components/data-explorer-table";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,7 @@ export default async function DataPage() {
         Source labels show where each row came from: website form submission or
         imported Reddit comment.
       </p>
+      <AdSlot slot={ADSENSE_SLOTS.data} />
       <DataExplorerTable rows={serializedEntries} />
     </main>
   );

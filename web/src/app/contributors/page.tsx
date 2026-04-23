@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AdSlot } from "@/components/ad-slot";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "Contributors",
@@ -40,6 +42,7 @@ export default function ContributorsPage() {
         </a>
         .
       </p>
+      <AdSlot slot={ADSENSE_SLOTS.contributors} />
     </main>
   );
 }

@@ -1,3 +1,6 @@
+import { AdSlot } from "@/components/ad-slot";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
+
 export default function AboutPage() {
   return (
     <main className="govuk-width-container app-main">
@@ -13,6 +16,7 @@ export default function AboutPage() {
         <li>Reddit imports are marked as unverified.</li>
         <li>Admins can remove spam or clearly false entries.</li>
       </ul>
+      <AdSlot slot={ADSENSE_SLOTS.about} />
     </main>
   );
 }

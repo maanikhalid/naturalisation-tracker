@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
+import { AdSenseScript } from "@/components/adsense-script";
+import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { PwaRegister } from "@/components/pwa-register";
 import { SiteHeader } from "@/components/site-header";
 import { getSiteUrl } from "@/lib/site";
@@ -86,8 +89,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           />
         </noscript>
         <PwaRegister />
+        <AdSenseScript />
         <SiteHeader />
         {children}
+        <CookieConsentBanner />
         <footer className="app-site-footer">
           <p className="app-site-footer__text">
             This tracker uses community-submitted timelines and automated processing to
@@ -96,6 +101,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           <p className="app-site-footer__text">
             Information may be incomplete or inaccurate, so please verify details
             independently before relying on them.
+          </p>
+          <p className="app-site-footer__text">
+            <Link href="/privacy" className="govuk-link">
+              Privacy policy
+            </Link>{" "}
+            |{" "}
+            <Link href="/cookies" className="govuk-link">
+              Cookie settings
+            </Link>
           </p>
         </footer>
       </body>
