@@ -173,8 +173,9 @@ function expectApprovalsApplicationDateRange(
   };
 }
 
-export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
+export function buildRealtimeStats(rows: RealtimeStatsInput[], asOfDate: Date = new Date()) {
   const approved = rows.filter((e) => e.approvalDate);
+  const asOf = dayjs(asOfDate);
 
   const last30BySubmitDate = [...approved]
     .sort(
@@ -212,7 +213,7 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
     };
   }
 
-  const fourDaysAgo = dayjs().subtract(4, "day");
+  const fourDaysAgo = asOf.subtract(4, "day");
   const acceptedLast4Days = rows.filter((e) =>
     dayjs(e.createdAt).isAfter(fourDaysAgo)
   );
@@ -236,6 +237,7 @@ export function buildRealtimeStats(rows: RealtimeStatsInput[]) {
     durations6m.length > 0 ? Math.max(...durations6m) : null;
 
   return {
+    asOfDate: asOf.toDate(),
     medianWaitLast30:
       medianWaitLast30 != null ? Math.round(medianWaitLast30) : null,
     expectApprovalsLabel,

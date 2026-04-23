@@ -288,6 +288,17 @@ samp {
   margin-bottom: 12px;
 }
 
+.admin-table__input,
+.admin-table__select {
+  min-width: 120px;
+}
+
+.admin-table__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 800px) {
   .inline-form {
     grid-template-columns: 1fr;

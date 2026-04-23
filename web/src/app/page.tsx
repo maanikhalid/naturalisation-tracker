@@ -26,7 +26,7 @@ export default async function HomePage() {
     }),
   ]);
   const stats = buildStats(rows);
-  const realtime = buildRealtimeStats(rows);
+  const realtime = buildRealtimeStats(rows, lastUpdated?.updatedAt ?? new Date());
 
   return (
     <main className="govuk-width-container app-main">

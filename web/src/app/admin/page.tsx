@@ -59,15 +59,31 @@ export default async function AdminPage() {
     (entry: {
       id: string;
       username: string | null;
+      applicationMethod: "ONLINE" | "POST";
       applicationDate: Date;
+      biometricDate: Date;
       approvalDate: Date | null;
+      receivedHomeOfficeEmail: boolean;
+      ceremonyDate: Date | null;
+      status:
+        | "SUBMITTED"
+        | "BIOMETRICS_DONE"
+        | "EMAIL_RECEIVED"
+        | "APPROVED"
+        | "CEREMONY_PENDING"
+        | "CEREMONY_DONE";
       sourceType: "WEBSITE" | "REDDIT";
       isVerified: boolean;
     }) => ({
     id: entry.id,
     username: entry.username,
+    applicationMethod: entry.applicationMethod,
     applicationDate: entry.applicationDate.toISOString(),
+    biometricDate: entry.biometricDate.toISOString(),
     approvalDate: entry.approvalDate ? entry.approvalDate.toISOString() : null,
+    receivedHomeOfficeEmail: entry.receivedHomeOfficeEmail,
+    ceremonyDate: entry.ceremonyDate ? entry.ceremonyDate.toISOString() : null,
+    status: entry.status,
     sourceType: entry.sourceType,
     isVerified: entry.isVerified,
     })

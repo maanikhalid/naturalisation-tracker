@@ -25,6 +25,11 @@ export const timelineInputSchema = z.object({
   ]),
 });
 
+export const adminTimelineInputSchema = timelineInputSchema.extend({
+  sourceType: z.enum(["WEBSITE", "REDDIT"]),
+  isVerified: z.coerce.boolean(),
+});
+
 export const redditConfigSchema = z.object({
   postUrl: z.string().url().includes("reddit.com"),
   syncIntervalMins: z.coerce.number().int().min(15).max(10080),
